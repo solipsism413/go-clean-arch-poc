@@ -9,6 +9,9 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/handler"
 	customMiddleware "github.com/handiism/go-clean-arch-poc/internal/transport/rest/middleware"
+
+	_ "github.com/handiism/go-clean-arch-poc/docs" // Swagger docs
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 // Router holds the HTTP router and handlers.
@@ -54,6 +57,11 @@ func (r *Router) registerRoutes() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// Swagger documentation
+	r.mux.Handle("/swagger/", http.StripPrefix("/swagger", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"), // The url pointing to API definition
+	)))
 
 	// Public auth routes
 	r.mux.HandleFunc("POST /api/v1/auth/login", r.authHandler.Login)
