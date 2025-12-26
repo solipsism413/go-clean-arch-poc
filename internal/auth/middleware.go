@@ -99,7 +99,7 @@ func (m *Middleware) AuthenticateOptional(next http.Handler) http.Handler {
 }
 
 // RequirePermission creates middleware that requires a specific permission.
-func (m *Middleware) RequirePermission(resource, action string) func(http.Handler) http.Handler {
+func (m *Middleware) RequirePermission(resource entity.ResourceType, action entity.PermissionAction) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := GetUserFromContext(r.Context())

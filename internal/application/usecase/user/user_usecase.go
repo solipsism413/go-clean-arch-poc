@@ -329,7 +329,7 @@ func (uc *UserUseCase) SeedSystemRoles(ctx context.Context) error {
 		}
 	}{
 		{
-			Name:        "admin",
+			Name:        entity.RoleAdmin,
 			Description: "Full system access",
 			Permissions: []struct {
 				Resource entity.ResourceType
@@ -343,7 +343,7 @@ func (uc *UserUseCase) SeedSystemRoles(ctx context.Context) error {
 			},
 		},
 		{
-			Name:        "manager",
+			Name:        entity.RoleManager,
 			Description: "Management access",
 			Permissions: []struct {
 				Resource entity.ResourceType
@@ -359,7 +359,7 @@ func (uc *UserUseCase) SeedSystemRoles(ctx context.Context) error {
 			},
 		},
 		{
-			Name:        "member",
+			Name:        entity.RoleMember,
 			Description: "Member access",
 			Permissions: []struct {
 				Resource entity.ResourceType
@@ -368,6 +368,18 @@ func (uc *UserUseCase) SeedSystemRoles(ctx context.Context) error {
 				{entity.ResourceTypeTask, entity.PermissionActionCreate},
 				{entity.ResourceTypeTask, entity.PermissionActionRead},
 				{entity.ResourceTypeTask, entity.PermissionActionUpdate},
+				{entity.ResourceTypeLabel, entity.PermissionActionRead},
+			},
+		},
+		{
+			Name:        entity.RoleViewer,
+			Description: "Viewer access",
+			Permissions: []struct {
+				Resource entity.ResourceType
+				Action   entity.PermissionAction
+			}{
+				{entity.ResourceTypeTask, entity.PermissionActionRead},
+				{entity.ResourceTypeUser, entity.PermissionActionRead},
 				{entity.ResourceTypeLabel, entity.PermissionActionRead},
 			},
 		},

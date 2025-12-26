@@ -165,5 +165,5 @@ func (u *User) GetAllPermissions() []Permission {
 
 // IsAdmin checks if the user has admin role.
 func (u *User) IsAdmin() bool {
-	return u.HasRole("admin")
+	return u.HasRole(RoleAdmin)
 }

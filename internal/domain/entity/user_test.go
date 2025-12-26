@@ -123,7 +123,7 @@ func TestUser_UpdatePassword(t *testing.T) {
 
 func TestUser_Roles(t *testing.T) {
 	user, _ := entity.NewUser("test@example.com", "password123", "Test User")
-	role, _ := entity.NewRole("admin", "Administrator role")
+	role, _ := entity.NewRole(entity.RoleAdmin, "Administrator role")
 
 	t.Run("assign role", func(t *testing.T) {
 		user.AssignRole(*role)
@@ -142,7 +142,7 @@ func TestUser_Roles(t *testing.T) {
 	})
 
 	t.Run("has role", func(t *testing.T) {
-		if !user.HasRole("admin") {
+		if !user.HasRole(entity.RoleAdmin) {
 			t.Error("HasRole() should return true for assigned role")
 		}
 		if user.HasRole("nonexistent") {
@@ -161,7 +161,7 @@ func TestUser_Roles(t *testing.T) {
 
 func TestUser_HasPermission(t *testing.T) {
 	user, _ := entity.NewUser("test@example.com", "password123", "Test User")
-	role, _ := entity.NewRole("admin", "Administrator role")
+	role, _ := entity.NewRole(entity.RoleAdmin, "Administrator role")
 	permission, _ := entity.NewPermission("create_task", "task", "create")
 	role.AddPermission(*permission)
 	user.AssignRole(*role)
@@ -182,7 +182,7 @@ func TestUser_HasPermission(t *testing.T) {
 func TestUser_IsAdmin(t *testing.T) {
 	t.Run("admin user", func(t *testing.T) {
 		user, _ := entity.NewUser("admin@example.com", "password123", "Admin User")
-		adminRole, _ := entity.NewRole("admin", "Administrator role")
+		adminRole, _ := entity.NewRole(entity.RoleAdmin, "Administrator role")
 		user.AssignRole(*adminRole)
 
 		if !user.IsAdmin() {

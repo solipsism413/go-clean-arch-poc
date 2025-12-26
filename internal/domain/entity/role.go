@@ -8,6 +8,13 @@ import (
 
 // Role represents a role in the RBAC system.
 // Roles group permissions together and can be assigned to users.
+const (
+	RoleAdmin   = "admin"
+	RoleManager = "manager"
+	RoleMember  = "member"
+	RoleViewer  = "viewer"
+)
+
 type Role struct {
 	// ID is the unique identifier for the role.
 	ID uuid.UUID

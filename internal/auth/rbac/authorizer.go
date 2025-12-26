@@ -11,7 +11,7 @@ import (
 // Authorizer provides RBAC authorization checks.
 type Authorizer struct {
 	// Predefined permission mappings
-	rolePermissions map[string][]string
+	rolePermissions map[string][]Permission
 }
 
 // NewAuthorizer creates a new RBAC authorizer.
@@ -22,59 +22,57 @@ func NewAuthorizer() *Authorizer {
 }
 
 // defaultRolePermissions returns default role-permission mappings.
-func defaultRolePermissions() map[string][]string {
-	return map[string][]string{
-		"admin": {
-			"tasks:*",
-			"users:*",
-			"roles:*",
-			"permissions:*",
-			"labels:*",
+func defaultRolePermissions() map[string][]Permission {
+	return map[string][]Permission{
+		entity.RoleAdmin: {
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionAll},
+			{Resource: entity.ResourceTypeUsers, Action: entity.PermissionActionAll},
+			{Resource: entity.ResourceTypeRoles, Action: entity.PermissionActionAll},
+			{Resource: entity.ResourceTypePermissions, Action: entity.PermissionActionAll},
+			{Resource: entity.ResourceTypeLabels, Action: entity.PermissionActionAll},
 		},
-		"manager": {
-			"tasks:create",
-			"tasks:read",
-			"tasks:update",
-			"tasks:delete",
-			"tasks:assign",
-			"users:read",
-			"labels:*",
+		entity.RoleManager: {
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionCreate},
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionRead},
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionUpdate},
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionDelete},
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionAssign},
+			{Resource: entity.ResourceTypeUsers, Action: entity.PermissionActionRead},
+			{Resource: entity.ResourceTypeLabels, Action: entity.PermissionActionAll},
 		},
-		"member": {
-			"tasks:create",
-			"tasks:read",
-			"tasks:update",
-			"labels:read",
+		entity.RoleMember: {
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionCreate},
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionRead},
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionUpdate},
+			{Resource: entity.ResourceTypeLabels, Action: entity.PermissionActionRead},
 		},
-		"viewer": {
-			"tasks:read",
-			"users:read",
-			"labels:read",
+		entity.RoleViewer: {
+			{Resource: entity.ResourceTypeTasks, Action: entity.PermissionActionRead},
+			{Resource: entity.ResourceTypeUsers, Action: entity.PermissionActionRead},
+			{Resource: entity.ResourceTypeLabels, Action: entity.PermissionActionRead},
 		},
 	}
 }
 
 // HasPermission checks if a user has a specific permission.
-func (a *Authorizer) HasPermission(ctx context.Context, user *entity.User, resource, action string) bool {
+func (a *Authorizer) HasPermission(ctx context.Context, user *entity.User, resource entity.ResourceType, action entity.PermissionAction) bool {
 	if user == nil {
 		return false
 	}
 
-	requiredPermission := resource + ":" + action
-
 	// Check user's roles
 	for _, role := range user.Roles {
-		// Check direct permissions
+		// Check direct permissions (from database)
 		for _, perm := range role.Permissions {
-			if a.matchPermission(string(perm.Resource)+":"+string(perm.Action), requiredPermission) {
+			if a.matchPermission(perm.Resource, perm.Action, resource, action) {
 				return true
 			}
 		}
 
-		// Check predefined role permissions
+		// Check predefined role permissions (from policy)
 		if perms, ok := a.rolePermissions[role.Name]; ok {
 			for _, perm := range perms {
-				if a.matchPermission(perm, requiredPermission) {
+				if a.matchPermission(perm.Resource, perm.Action, resource, action) {
 					return true
 				}
 			}
@@ -116,7 +114,7 @@ func (a *Authorizer) CanManageTask(ctx context.Context, user *entity.User, task 
 	}
 
 	// Admin can manage all tasks
-	if a.HasRole(ctx, user, "admin") {
+	if a.HasRole(ctx, user, entity.RoleAdmin) {
 		return true
 	}
 
@@ -131,7 +129,7 @@ func (a *Authorizer) CanManageTask(ctx context.Context, user *entity.User, task 
 	}
 
 	// Managers can manage all tasks
-	if a.HasRole(ctx, user, "manager") {
+	if a.HasRole(ctx, user, entity.RoleManager) {
 		return true
 	}
 
@@ -145,7 +143,7 @@ func (a *Authorizer) CanViewTask(ctx context.Context, user *entity.User, task *e
 	}
 
 	// Anyone with tasks:read permission can view
-	return a.HasPermission(ctx, user, "tasks", "read")
+	return a.HasPermission(ctx, user, entity.ResourceTypeTasks, entity.PermissionActionRead)
 }
 
 // CanManageUser checks if a user can manage another user.
@@ -155,7 +153,7 @@ func (a *Authorizer) CanManageUser(ctx context.Context, actor *entity.User, targ
 	}
 
 	// Admin can manage all users
-	if a.HasRole(ctx, actor, "admin") {
+	if a.HasRole(ctx, actor, entity.RoleAdmin) {
 		return true
 	}
 
@@ -168,43 +166,19 @@ func (a *Authorizer) CanManageUser(ctx context.Context, actor *entity.User, targ
 }
 
 // matchPermission checks if a permission matches, supporting wildcards.
-func (a *Authorizer) matchPermission(permission, required string) bool {
-	// Exact match
-	if permission == required {
-		return true
-	}
-
-	// Wildcard match (e.g., "tasks:*" matches "tasks:read")
-	if len(permission) > 0 && permission[len(permission)-1] == '*' {
-		prefix := permission[:len(permission)-1]
-		if len(required) >= len(prefix) && required[:len(prefix)] == prefix {
-			return true
-		}
-	}
-
-	// Full wildcard
-	if permission == "*" {
-		return true
-	}
-
-	return false
+func (a *Authorizer) matchPermission(
+	pResource entity.ResourceType,
+	pAction entity.PermissionAction,
+	requiredResource entity.ResourceType,
+	requiredAction entity.PermissionAction,
+) bool {
+	resourceMatches := pResource == entity.ResourceTypeAll || pResource == requiredResource
+	actionMatches := pAction == entity.PermissionActionAll || pAction == requiredAction
+	return resourceMatches && actionMatches
 }
 
 // Permission represents a permission in the format "resource:action".
 type Permission struct {
-	Resource string
-	Action   string
-}
-
-// ParsePermission parses a permission string.
-func ParsePermission(perm string) Permission {
-	for i, c := range perm {
-		if c == ':' {
-			return Permission{
-				Resource: perm[:i],
-				Action:   perm[i+1:],
-			}
-		}
-	}
-	return Permission{Resource: perm, Action: "*"}
+	Resource entity.ResourceType
+	Action   entity.PermissionAction
 }
