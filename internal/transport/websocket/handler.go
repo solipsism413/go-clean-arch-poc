@@ -15,14 +15,6 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins in development
-	},
-}
-
 // MessageType defines WebSocket message types.
 type MessageType string
 
@@ -135,6 +127,7 @@ type Handler struct {
 	hub         *Hub
 	taskService input.TaskService
 	authService input.AuthService
+	upgrader    websocket.Upgrader
 	logger      *slog.Logger
 }
 
@@ -144,14 +137,21 @@ func NewHandler(hub *Hub, taskService input.TaskService, authService input.AuthS
 		hub:         hub,
 		taskService: taskService,
 		authService: authService,
-		logger:      logger,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			CheckOrigin: func(r *http.Request) bool {
+				return true // Allow all origins in development
+			},
+		},
+		logger: logger,
 	}
 }
 
 // ServeHTTP handles WebSocket upgrade requests.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Upgrade to WebSocket
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Error("failed to upgrade connection", "error", err)
 		return

@@ -3,6 +3,8 @@ package querybuilder
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -54,9 +56,18 @@ type TaskRow struct {
 // FindWithFilter finds tasks matching the given filter and pagination.
 func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.TaskFilter, pagination dto.Pagination) ([]*entity.Task, int64, error) {
 	// Build the count query first
-	countQuery := Psql.Select("COUNT(*)").From("tasks")
-	countQuery = WhereNotEmpty(countQuery, "status", stringPtrToString(filter.Status))
-	countQuery = WhereNotEmpty(countQuery, "priority", stringPtrToString(filter.Priority))
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	countQuery := psql.Select("COUNT(*)").From("tasks")
+
+	statusStr := stringPtrToString(filter.Status)
+	if statusStr != "" {
+		countQuery = countQuery.Where(sq.Eq{"status": statusStr})
+	}
+
+	priorityStr := stringPtrToString(filter.Priority)
+	if priorityStr != "" {
+		countQuery = countQuery.Where(sq.Eq{"priority": priorityStr})
+	}
 
 	if filter.AssigneeID != nil {
 		countQuery = countQuery.Where(sq.Eq{"assignee_id": *filter.AssigneeID})
@@ -65,7 +76,7 @@ func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.Task
 		countQuery = countQuery.Where(sq.Eq{"creator_id": *filter.CreatorID})
 	}
 	if filter.Search != "" {
-		countQuery = WhereILike(countQuery, "title", filter.Search)
+		countQuery = countQuery.Where(sq.ILike{"title": "%" + filter.Search + "%"})
 	}
 
 	countSQL, countArgs, err := countQuery.ToSql()
@@ -84,13 +95,17 @@ func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.Task
 	}
 
 	// Build the select query
-	selectQuery := Psql.Select(
+	selectQuery := psql.Select(
 		"id", "title", "description", "status", "priority",
 		"due_date", "assignee_id", "creator_id", "created_at", "updated_at",
 	).From("tasks")
 
-	selectQuery = WhereNotEmpty(selectQuery, "status", stringPtrToString(filter.Status))
-	selectQuery = WhereNotEmpty(selectQuery, "priority", stringPtrToString(filter.Priority))
+	if statusStr != "" {
+		selectQuery = selectQuery.Where(sq.Eq{"status": statusStr})
+	}
+	if priorityStr != "" {
+		selectQuery = selectQuery.Where(sq.Eq{"priority": priorityStr})
+	}
 
 	if filter.AssigneeID != nil {
 		selectQuery = selectQuery.Where(sq.Eq{"assignee_id": *filter.AssigneeID})
@@ -99,7 +114,7 @@ func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.Task
 		selectQuery = selectQuery.Where(sq.Eq{"creator_id": *filter.CreatorID})
 	}
 	if filter.Search != "" {
-		selectQuery = WhereILike(selectQuery, "title", filter.Search)
+		selectQuery = selectQuery.Where(sq.ILike{"title": "%" + filter.Search + "%"})
 	}
 
 	// Apply sorting
@@ -107,10 +122,39 @@ func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.Task
 	if sortBy == "" {
 		sortBy = "created_at"
 	}
-	selectQuery = OrderBySafe(selectQuery, sortBy, pagination.SortDesc, TaskAllowedSortColumns)
+
+	// Validate sort column
+	isAllowedSort := false
+	for _, allowed := range TaskAllowedSortColumns {
+		if strings.EqualFold(sortBy, allowed) {
+			sortBy = allowed
+			isAllowedSort = true
+			break
+		}
+	}
+
+	if isAllowedSort {
+		direction := "ASC"
+		if pagination.SortDesc {
+			direction = "DESC"
+		}
+		selectQuery = selectQuery.OrderBy(fmt.Sprintf("%s %s", sortBy, direction))
+	}
 
 	// Apply pagination
-	selectQuery = Paginate(selectQuery, pagination.Page, pagination.PageSize)
+	page := pagination.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := pagination.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	selectQuery = selectQuery.Limit(uint64(pageSize)).Offset(uint64(offset))
 
 	selectSQL, selectArgs, err := selectQuery.ToSql()
 	if err != nil {
@@ -133,12 +177,12 @@ func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.Task
 
 // Search performs a full-text search on tasks.
 func (tqb *TaskQueryBuilder) Search(ctx context.Context, query string, pagination dto.Pagination) ([]*entity.Task, int64, error) {
-	searchColumns := []string{"title", "description"}
 
 	// Build count query with search
-	countQuery := Psql.Select("COUNT(*)").From("tasks")
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	countQuery := psql.Select("COUNT(*)").From("tasks")
 	if query != "" {
-		countQuery = WhereILike(countQuery, "title", query)
+		countQuery = countQuery.Where(sq.ILike{"title": "%" + query + "%"})
 	}
 
 	countSQL, countArgs, err := countQuery.ToSql()
@@ -157,20 +201,53 @@ func (tqb *TaskQueryBuilder) Search(ctx context.Context, query string, paginatio
 	}
 
 	// Build select query with search
-	opts := FilterOptions{
-		Search:   query,
-		SortBy:   pagination.SortBy,
-		SortDesc: pagination.SortDesc,
-		Page:     pagination.Page,
-		PageSize: pagination.PageSize,
-	}
-
-	selectQuery := Psql.Select(
+	selectQuery := psql.Select(
 		"id", "title", "description", "status", "priority",
 		"due_date", "assignee_id", "creator_id", "created_at", "updated_at",
 	).From("tasks")
 
-	selectQuery = ApplyFilters(selectQuery, opts, searchColumns, TaskAllowedSortColumns)
+	if query != "" {
+		or := sq.Or{
+			sq.ILike{"title": "%" + query + "%"},
+			sq.ILike{"description": "%" + query + "%"},
+		}
+		selectQuery = selectQuery.Where(or)
+	}
+
+	// Apply sorting
+	sortBy := pagination.SortBy
+	if sortBy != "" {
+		isAllowedSort := false
+		for _, allowed := range TaskAllowedSortColumns {
+			if strings.EqualFold(sortBy, allowed) {
+				sortBy = allowed
+				isAllowedSort = true
+				break
+			}
+		}
+		if isAllowedSort {
+			direction := "ASC"
+			if pagination.SortDesc {
+				direction = "DESC"
+			}
+			selectQuery = selectQuery.OrderBy(fmt.Sprintf("%s %s", sortBy, direction))
+		}
+	}
+
+	// Apply pagination
+	page := pagination.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := pagination.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	selectQuery = selectQuery.Limit(uint64(pageSize)).Offset(uint64(offset))
 
 	selectSQL, selectArgs, err := selectQuery.ToSql()
 	if err != nil {
@@ -196,7 +273,8 @@ func (tqb *TaskQueryBuilder) FindOverdue(ctx context.Context, pagination dto.Pag
 	now := time.Now()
 
 	// Build count query
-	countQuery := Psql.Select("COUNT(*)").
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	countQuery := psql.Select("COUNT(*)").
 		From("tasks").
 		Where(sq.Lt{"due_date": now}).
 		Where(sq.NotEq{"status": []string{"DONE", "ARCHIVED"}})
@@ -217,7 +295,8 @@ func (tqb *TaskQueryBuilder) FindOverdue(ctx context.Context, pagination dto.Pag
 	}
 
 	// Build select query
-	selectQuery := Psql.Select(
+	// Build select query
+	selectQuery := psql.Select(
 		"id", "title", "description", "status", "priority",
 		"due_date", "assignee_id", "creator_id", "created_at", "updated_at",
 	).
@@ -226,7 +305,20 @@ func (tqb *TaskQueryBuilder) FindOverdue(ctx context.Context, pagination dto.Pag
 		Where(sq.NotEq{"status": []string{"DONE", "ARCHIVED"}}).
 		OrderBy("due_date ASC")
 
-	selectQuery = Paginate(selectQuery, pagination.Page, pagination.PageSize)
+	// Apply pagination
+	page := pagination.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := pagination.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	selectQuery = selectQuery.Limit(uint64(pageSize)).Offset(uint64(offset))
 
 	selectSQL, selectArgs, err := selectQuery.ToSql()
 	if err != nil {

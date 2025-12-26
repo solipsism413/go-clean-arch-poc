@@ -120,7 +120,7 @@ func main() {
 	_ = aclRepo // Keep reference for authorization
 
 	// Initialize validator
-	v := validation.GetValidator()
+	v := validation.NewValidator()
 
 	// Initialize use cases
 	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, v, log)

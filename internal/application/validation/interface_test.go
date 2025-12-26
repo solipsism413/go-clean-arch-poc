@@ -25,7 +25,7 @@ func (m *MockValidator) ValidateVar(field any, tag string) error {
 
 func TestValidatorInterface(t *testing.T) {
 	// Test that StructValidator implements Validator interface
-	var _ validation.Validator = validation.GetValidator()
+	var _ validation.Validator = validation.NewValidator()
 
 	t.Run("MockValidator test", func(t *testing.T) {
 		m := new(MockValidator)

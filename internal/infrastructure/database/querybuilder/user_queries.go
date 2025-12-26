@@ -3,8 +3,11 @@ package querybuilder
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -46,10 +49,11 @@ type UserRow struct {
 // FindWithFilter finds users matching the given filter and pagination.
 func (uqb *UserQueryBuilder) FindWithFilter(ctx context.Context, filter dto.UserFilter, pagination dto.Pagination) ([]*entity.User, int64, error) {
 	// Build count query
-	countQuery := Psql.Select("COUNT(*)").From("users")
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	countQuery := psql.Select("COUNT(*)").From("users")
 
 	if filter.Search != "" {
-		countQuery = WhereILike(countQuery, "name", filter.Search)
+		countQuery = countQuery.Where(sq.ILike{"name": "%" + filter.Search + "%"})
 	}
 	if filter.RoleID != nil {
 		countQuery = countQuery.Where("id IN (SELECT user_id FROM user_roles WHERE role_id = ?)", *filter.RoleID)
@@ -71,12 +75,12 @@ func (uqb *UserQueryBuilder) FindWithFilter(ctx context.Context, filter dto.User
 	}
 
 	// Build select query
-	selectQuery := Psql.Select(
+	selectQuery := psql.Select(
 		"id", "email", "password_hash", "name", "created_at", "updated_at",
 	).From("users")
 
 	if filter.Search != "" {
-		selectQuery = WhereILike(selectQuery, "name", filter.Search)
+		selectQuery = selectQuery.Where(sq.ILike{"name": "%" + filter.Search + "%"})
 	}
 	if filter.RoleID != nil {
 		selectQuery = selectQuery.Where("id IN (SELECT user_id FROM user_roles WHERE role_id = ?)", *filter.RoleID)
@@ -87,10 +91,38 @@ func (uqb *UserQueryBuilder) FindWithFilter(ctx context.Context, filter dto.User
 	if sortBy == "" {
 		sortBy = "created_at"
 	}
-	selectQuery = OrderBySafe(selectQuery, sortBy, pagination.SortDesc, UserAllowedSortColumns)
+
+	isAllowedSort := false
+	for _, allowed := range UserAllowedSortColumns {
+		if strings.EqualFold(sortBy, allowed) {
+			sortBy = allowed
+			isAllowedSort = true
+			break
+		}
+	}
+
+	if isAllowedSort {
+		direction := "ASC"
+		if pagination.SortDesc {
+			direction = "DESC"
+		}
+		selectQuery = selectQuery.OrderBy(fmt.Sprintf("%s %s", sortBy, direction))
+	}
 
 	// Apply pagination
-	selectQuery = Paginate(selectQuery, pagination.Page, pagination.PageSize)
+	page := pagination.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := pagination.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	selectQuery = selectQuery.Limit(uint64(pageSize)).Offset(uint64(offset))
 
 	selectSQL, selectArgs, err := selectQuery.ToSql()
 	if err != nil {
@@ -113,20 +145,11 @@ func (uqb *UserQueryBuilder) FindWithFilter(ctx context.Context, filter dto.User
 
 // Search performs a search on users by name or email.
 func (uqb *UserQueryBuilder) Search(ctx context.Context, query string, pagination dto.Pagination) ([]*entity.User, int64, error) {
-	searchColumns := []string{"name", "email"}
-
-	opts := FilterOptions{
-		Search:   query,
-		SortBy:   pagination.SortBy,
-		SortDesc: pagination.SortDesc,
-		Page:     pagination.Page,
-		PageSize: pagination.PageSize,
-	}
-
 	// Count query
-	countQuery := Psql.Select("COUNT(*)").From("users")
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	countQuery := psql.Select("COUNT(*)").From("users")
 	if query != "" {
-		countQuery = WhereILike(countQuery, "name", query)
+		countQuery = countQuery.Where(sq.ILike{"name": "%" + query + "%"})
 	}
 
 	countSQL, countArgs, err := countQuery.ToSql()
@@ -145,11 +168,52 @@ func (uqb *UserQueryBuilder) Search(ctx context.Context, query string, paginatio
 	}
 
 	// Select query
-	selectQuery := Psql.Select(
+	selectQuery := psql.Select(
 		"id", "email", "password_hash", "name", "created_at", "updated_at",
 	).From("users")
 
-	selectQuery = ApplyFilters(selectQuery, opts, searchColumns, UserAllowedSortColumns)
+	if query != "" {
+		or := sq.Or{
+			sq.ILike{"name": "%" + query + "%"},
+			sq.ILike{"email": "%" + query + "%"},
+		}
+		selectQuery = selectQuery.Where(or)
+	}
+
+	// Apply sorting
+	sortBy := pagination.SortBy
+	if sortBy != "" {
+		isAllowedSort := false
+		for _, allowed := range UserAllowedSortColumns {
+			if strings.EqualFold(sortBy, allowed) {
+				sortBy = allowed
+				isAllowedSort = true
+				break
+			}
+		}
+		if isAllowedSort {
+			direction := "ASC"
+			if pagination.SortDesc {
+				direction = "DESC"
+			}
+			selectQuery = selectQuery.OrderBy(fmt.Sprintf("%s %s", sortBy, direction))
+		}
+	}
+
+	// Apply pagination
+	page := pagination.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := pagination.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	selectQuery = selectQuery.Limit(uint64(pageSize)).Offset(uint64(offset))
 
 	selectSQL, selectArgs, err := selectQuery.ToSql()
 	if err != nil {

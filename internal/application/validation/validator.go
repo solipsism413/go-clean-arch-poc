@@ -4,7 +4,6 @@ package validation
 import (
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -20,31 +19,23 @@ type StructValidator struct {
 	validate *validator.Validate
 }
 
-var (
-	instance *StructValidator
-	once     sync.Once
-)
+// NewValidator creates a new instance of StructValidator.
+func NewValidator() *StructValidator {
+	v := validator.New()
 
-// GetValidator returns a singleton validator instance.
-func GetValidator() *StructValidator {
-	once.Do(func() {
-		v := validator.New()
-
-		// Use JSON tag names in error messages
-		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
-			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
-			if name == "-" {
-				return ""
-			}
-			return name
-		})
-
-		// Register custom validations
-		registerCustomValidations(v)
-
-		instance = &StructValidator{validate: v}
+	// Use JSON tag names in error messages
+	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+		if name == "-" {
+			return ""
+		}
+		return name
 	})
-	return instance
+
+	// Register custom validations
+	registerCustomValidations(v)
+
+	return &StructValidator{validate: v}
 }
 
 // Validate validates a struct and returns validation errors.
