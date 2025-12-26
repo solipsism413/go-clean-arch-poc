@@ -1,0 +1,55 @@
+# Dependencies
+/vendor/
+
+# Build artifacts
+/bin/
+/dist/
+/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Temp files
+temp/
+
+# Docker
+docker-compose.override.yml
+
+# Generated files
+docs/swagger.json
+docs/swagger.yaml
+docs/docs.go
+
+# SQLC generated files
+internal/infrastructure/database/sqlc/*.sql.go
+internal/infrastructure/database/sqlc/db.go
+internal/infrastructure/database/sqlc/models.go

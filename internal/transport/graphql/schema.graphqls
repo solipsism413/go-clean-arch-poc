@@ -1,0 +1,234 @@
+# GraphQL Schema for Task Management Application
+
+scalar UUID
+scalar DateTime
+
+type Query {
+  # Task queries
+  task(id: UUID!): Task
+  tasks(filter: TaskFilter, pagination: PaginationInput): TaskConnection!
+
+  # User queries
+  me: User!
+  user(id: UUID!): User
+  users(filter: UserFilter, pagination: PaginationInput): UserConnection!
+
+  # Role queries
+  roles: [Role!]!
+  role(id: UUID!): Role
+
+  # Label queries
+  labels: [Label!]!
+}
+
+type Mutation {
+  # Authentication
+  login(input: LoginInput!): AuthPayload!
+  register(input: RegisterInput!): AuthPayload!
+  refreshToken(refreshToken: String!): AuthPayload!
+  logout: Boolean!
+
+  # Task mutations
+  createTask(input: CreateTaskInput!): Task!
+  updateTask(id: UUID!, input: UpdateTaskInput!): Task!
+  deleteTask(id: UUID!): Boolean!
+  assignTask(id: UUID!, assigneeId: UUID!): Task!
+  unassignTask(id: UUID!): Task!
+  changeTaskStatus(id: UUID!, status: TaskStatus!): Task!
+  addLabelToTask(taskId: UUID!, labelId: UUID!): Task!
+  removeLabelFromTask(taskId: UUID!, labelId: UUID!): Task!
+
+  # User mutations
+  updateUser(id: UUID!, input: UpdateUserInput!): User!
+  deleteUser(id: UUID!): Boolean!
+  assignRole(userId: UUID!, roleId: UUID!): User!
+  removeRole(userId: UUID!, roleId: UUID!): User!
+  changePassword(input: ChangePasswordInput!): Boolean!
+
+  # Label mutations
+  createLabel(input: CreateLabelInput!): Label!
+  updateLabel(id: UUID!, input: UpdateLabelInput!): Label!
+  deleteLabel(id: UUID!): Boolean!
+}
+
+type Subscription {
+  # Real-time task updates
+  taskCreated: Task!
+  taskUpdated(id: UUID): Task!
+  taskDeleted: UUID!
+  taskAssigned(assigneeId: UUID): Task!
+}
+
+# ========== Types ==========
+
+type Task {
+  id: UUID!
+  title: String!
+  description: String
+  status: TaskStatus!
+  priority: Priority!
+  dueDate: DateTime
+  assignee: User
+  creator: User!
+  labels: [Label!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type User {
+  id: UUID!
+  email: String!
+  name: String!
+  roles: [Role!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Role {
+  id: UUID!
+  name: String!
+  description: String
+  permissions: [Permission!]!
+  createdAt: DateTime!
+}
+
+type Permission {
+  id: UUID!
+  name: String!
+  resource: String!
+  action: String!
+}
+
+type Label {
+  id: UUID!
+  name: String!
+  color: String!
+  createdAt: DateTime!
+}
+
+type AuthPayload {
+  accessToken: String!
+  refreshToken: String!
+  expiresAt: DateTime!
+  user: User!
+}
+
+# ========== Enums ==========
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  ARCHIVED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+# ========== Inputs ==========
+
+input CreateTaskInput {
+  title: String!
+  description: String
+  priority: Priority = MEDIUM
+  dueDate: DateTime
+  assigneeId: UUID
+  labelIds: [UUID!]
+}
+
+input UpdateTaskInput {
+  title: String
+  description: String
+  priority: Priority
+  dueDate: DateTime
+}
+
+input TaskFilter {
+  status: TaskStatus
+  priority: Priority
+  assigneeId: UUID
+  creatorId: UUID
+  labelIds: [UUID!]
+  search: String
+  dueBefore: DateTime
+  dueAfter: DateTime
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  name: String!
+}
+
+input UpdateUserInput {
+  email: String
+  name: String
+}
+
+input UserFilter {
+  search: String
+  roleId: UUID
+}
+
+input ChangePasswordInput {
+  oldPassword: String!
+  newPassword: String!
+}
+
+input CreateLabelInput {
+  name: String!
+  color: String!
+}
+
+input UpdateLabelInput {
+  name: String
+  color: String
+}
+
+input PaginationInput {
+  page: Int = 1
+  pageSize: Int = 20
+  sortBy: String
+  sortDesc: Boolean = false
+}
+
+# ========== Connections (Pagination) ==========
+
+type TaskConnection {
+  edges: [TaskEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type TaskEdge {
+  node: Task!
+  cursor: String!
+}
+
+type UserConnection {
+  edges: [UserEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type UserEdge {
+  node: User!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}

@@ -1,0 +1,33 @@
+# gqlgen configuration
+# https://gqlgen.com/config/
+
+schema:
+  - internal/transport/graphql/*.graphqls
+
+exec:
+  filename: internal/transport/graphql/generated/generated.go
+  package: generated
+
+model:
+  filename: internal/transport/graphql/model/models_gen.go
+  package: model
+
+resolver:
+  layout: follow-schema
+  dir: internal/transport/graphql/resolver
+  package: resolver
+
+autobind:
+  - github.com/handiism/go-clean-arch-poc/internal/transport/graphql/model
+
+models:
+  UUID:
+    model:
+      - github.com/google/uuid.UUID
+  DateTime:
+    model:
+      - time.Time
+  TaskStatus:
+    model: github.com/handiism/go-clean-arch-poc/internal/domain/valueobject.TaskStatus
+  Priority:
+    model: github.com/handiism/go-clean-arch-poc/internal/domain/valueobject.Priority

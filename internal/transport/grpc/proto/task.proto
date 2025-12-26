@@ -1,0 +1,269 @@
+syntax = "proto3";
+
+package taskmanager.v1;
+
+option go_package = "github.com/handiism/go-clean-arch-poc/internal/transport/grpc/pb";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// TaskService provides gRPC methods for task management.
+service TaskService {
+  // Create a new task
+  rpc CreateTask(CreateTaskRequest) returns (Task);
+  
+  // Get a task by ID
+  rpc GetTask(GetTaskRequest) returns (Task);
+  
+  // List tasks with filtering and pagination
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  
+  // Update an existing task
+  rpc UpdateTask(UpdateTaskRequest) returns (Task);
+  
+  // Delete a task
+  rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
+  
+  // Assign a task to a user
+  rpc AssignTask(AssignTaskRequest) returns (Task);
+  
+  // Change task status
+  rpc ChangeTaskStatus(ChangeTaskStatusRequest) returns (Task);
+  
+  // Stream task updates (server streaming)
+  rpc StreamTaskUpdates(StreamTaskUpdatesRequest) returns (stream TaskEvent);
+}
+
+// UserService provides gRPC methods for user management.
+service UserService {
+  // Get current user
+  rpc GetMe(google.protobuf.Empty) returns (User);
+  
+  // Get user by ID
+  rpc GetUser(GetUserRequest) returns (User);
+  
+  // List users
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  
+  // Create a new user
+  rpc CreateUser(CreateUserRequest) returns (User);
+  
+  // Update user
+  rpc UpdateUser(UpdateUserRequest) returns (User);
+  
+  // Delete user
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+}
+
+// AuthService provides authentication methods.
+service AuthService {
+  // Login with credentials
+  rpc Login(LoginRequest) returns (AuthResponse);
+  
+  // Refresh access token
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthResponse);
+  
+  // Logout
+  rpc Logout(google.protobuf.Empty) returns (google.protobuf.Empty);
+}
+
+// ========== Messages ==========
+
+message Task {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  TaskStatus status = 4;
+  Priority priority = 5;
+  google.protobuf.Timestamp due_date = 6;
+  string assignee_id = 7;
+  string creator_id = 8;
+  repeated Label labels = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  repeated Role roles = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message Role {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated Permission permissions = 4;
+}
+
+message Permission {
+  string id = 1;
+  string name = 2;
+  string resource = 3;
+  string action = 4;
+}
+
+message Label {
+  string id = 1;
+  string name = 2;
+  string color = 3;
+}
+
+message AuthResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  User user = 4;
+}
+
+// ========== Enums ==========
+
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_TODO = 1;
+  TASK_STATUS_IN_PROGRESS = 2;
+  TASK_STATUS_IN_REVIEW = 3;
+  TASK_STATUS_DONE = 4;
+  TASK_STATUS_ARCHIVED = 5;
+}
+
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_MEDIUM = 2;
+  PRIORITY_HIGH = 3;
+  PRIORITY_URGENT = 4;
+}
+
+enum TaskEventType {
+  TASK_EVENT_TYPE_UNSPECIFIED = 0;
+  TASK_EVENT_TYPE_CREATED = 1;
+  TASK_EVENT_TYPE_UPDATED = 2;
+  TASK_EVENT_TYPE_DELETED = 3;
+  TASK_EVENT_TYPE_ASSIGNED = 4;
+  TASK_EVENT_TYPE_STATUS_CHANGED = 5;
+}
+
+// ========== Request/Response Messages ==========
+
+message CreateTaskRequest {
+  string title = 1;
+  string description = 2;
+  Priority priority = 3;
+  google.protobuf.Timestamp due_date = 4;
+  string assignee_id = 5;
+  repeated string label_ids = 6;
+}
+
+message GetTaskRequest {
+  string id = 1;
+}
+
+message ListTasksRequest {
+  TaskFilter filter = 1;
+  Pagination pagination = 2;
+}
+
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  int64 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message UpdateTaskRequest {
+  string id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional Priority priority = 4;
+  optional google.protobuf.Timestamp due_date = 5;
+}
+
+message DeleteTaskRequest {
+  string id = 1;
+}
+
+message AssignTaskRequest {
+  string task_id = 1;
+  string assignee_id = 2;
+}
+
+message ChangeTaskStatusRequest {
+  string task_id = 1;
+  TaskStatus status = 2;
+}
+
+message StreamTaskUpdatesRequest {
+  // Optional filter for specific tasks
+  repeated string task_ids = 1;
+}
+
+message TaskEvent {
+  TaskEventType type = 1;
+  Task task = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}
+
+message TaskFilter {
+  optional TaskStatus status = 1;
+  optional Priority priority = 2;
+  optional string assignee_id = 3;
+  optional string creator_id = 4;
+  optional string search = 5;
+}
+
+message Pagination {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort_by = 3;
+  bool sort_desc = 4;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message ListUsersRequest {
+  UserFilter filter = 1;
+  Pagination pagination = 2;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  int64 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message UserFilter {
+  optional string search = 1;
+  optional string role_id = 2;
+}
+
+message CreateUserRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  optional string email = 2;
+  optional string name = 3;
+}
+
+message DeleteUserRequest {
+  string id = 1;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
