@@ -126,11 +126,11 @@ type CreateACLEntryInput struct {
 // ACLEntryOutput represents the output for ACL operations.
 type ACLEntryOutput struct {
 	ID           uuid.UUID `json:"id"`
-	ResourceType string    `json:"resourceType"`
+	ResourceType entity.ResourceType `json:"resourceType"`
 	ResourceID   uuid.UUID `json:"resourceId"`
-	SubjectType  string    `json:"subjectType"`
+	SubjectType  entity.ACLSubjectType `json:"subjectType"`
 	SubjectID    uuid.UUID `json:"subjectId"`
-	Permission   string    `json:"permission"`
+	Permission   entity.ACLPermission `json:"permission"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
@@ -141,11 +141,11 @@ func ACLEntryFromEntity(entry *entity.ACLEntry) *ACLEntryOutput {
 	}
 	return &ACLEntryOutput{
 		ID:           entry.ID,
-		ResourceType: string(entry.ResourceType),
+		ResourceType: entry.ResourceType,
 		ResourceID:   entry.ResourceID,
 		SubjectType:  entry.SubjectType,
 		SubjectID:    entry.SubjectID,
-		Permission:   string(entry.Permission),
+		Permission:   entry.Permission,
 		CreatedAt:    entry.CreatedAt,
 	}
 }
