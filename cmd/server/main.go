@@ -22,7 +22,6 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/kafka"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/observability/logger"
 	s3Storage "github.com/handiism/go-clean-arch-poc/internal/infrastructure/storage/s3"
-	grpcTransport "github.com/handiism/go-clean-arch-poc/internal/transport/grpc"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/socketio"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/sse"
@@ -163,18 +162,6 @@ func main() {
 	}
 
 	// =====================
-	// Initialize gRPC Server
-	// =====================
-	grpcServer := grpcTransport.NewServer(log)
-	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, 9090)
-	if err := grpcServer.Start(ctx, grpcAddr); err != nil {
-		log.Warn("failed to start gRPC server", "error", err)
-	} else {
-		log.Info("grpc server started", "addr", grpcAddr)
-	}
-	defer grpcServer.Stop()
-
-	// =====================
 	// Initialize REST Router
 	// =====================
 	router := rest.NewRouter(taskService, userService, authService, log)
@@ -215,7 +202,6 @@ func main() {
 	log.Info("WebSocket", "url", fmt.Sprintf("ws://%s/ws", server.Addr))
 	log.Info("SSE", "url", fmt.Sprintf("http://%s/events", server.Addr))
 	log.Info("Socket.IO", "url", fmt.Sprintf("http://%s/socket.io/", server.Addr))
-	log.Info("gRPC", "url", grpcAddr)
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)

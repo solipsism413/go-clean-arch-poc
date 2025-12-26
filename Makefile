@@ -4,19 +4,38 @@
 
 # Variables
 APP_NAME := task-manager
+API_NAME := task-manager-api
+GRPC_NAME := task-manager-grpc
 BUILD_DIR := ./bin
-MAIN_PATH := ./cmd/server
+API_MAIN := ./cmd/server
+GRPC_MAIN := ./cmd/grpc
 DOCKER_COMPOSE := docker-compose
 
-# Build the application
-build:
-	@echo "Building $(APP_NAME)..."
-	go build -o $(BUILD_DIR)/$(APP_NAME) $(MAIN_PATH)
+# Build both services
+build: build-api build-grpc
 
-# Run the application
-run:
-	@echo "Running $(APP_NAME)..."
-	go run $(MAIN_PATH)
+# Build the API application
+build-api:
+	@echo "Building $(API_NAME)..."
+	go build -o $(BUILD_DIR)/$(API_NAME) $(API_MAIN)
+
+# Build the gRPC application
+build-grpc:
+	@echo "Building $(GRPC_NAME)..."
+	go build -o $(BUILD_DIR)/$(GRPC_NAME) $(GRPC_MAIN)
+
+# Run the API application
+run: run-api
+
+# Run the API application
+run-api:
+	@echo "Running $(API_NAME)..."
+	go run $(API_MAIN)
+
+# Run the gRPC application
+run-grpc:
+	@echo "Running $(GRPC_NAME)..."
+	go run $(GRPC_MAIN)
 
 # Run with hot reload
 dev:
