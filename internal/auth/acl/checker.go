@@ -9,15 +9,6 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 )
 
-// ResourceType defines types of resources that can have ACL entries.
-type ResourceType string
-
-const (
-	ResourceTypeTask    ResourceType = "task"
-	ResourceTypeProject ResourceType = "project"
-	ResourceTypeLabel   ResourceType = "label"
-)
-
 // SubjectType defines types of subjects that can be granted permissions.
 type SubjectType string
 
@@ -49,7 +40,7 @@ func NewChecker(aclRepo output.ACLRepository) *Checker {
 }
 
 // CanAccess checks if a user has the specified permission on a resource.
-func (c *Checker) CanAccess(ctx context.Context, user *entity.User, resourceType ResourceType, resourceID uuid.UUID, permission Permission) (bool, error) {
+func (c *Checker) CanAccess(ctx context.Context, user *entity.User, resourceType entity.ResourceType, resourceID uuid.UUID, permission Permission) (bool, error) {
 	if user == nil {
 		return false, nil
 	}
@@ -128,13 +119,13 @@ func (c *Checker) CanAccess(ctx context.Context, user *entity.User, resourceType
 }
 
 // GrantAccess grants a permission to a user on a resource.
-func (c *Checker) GrantAccess(ctx context.Context, resourceType ResourceType, resourceID uuid.UUID, subjectType SubjectType, subjectID uuid.UUID, permission Permission) error {
+func (c *Checker) GrantAccess(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID, subjectType SubjectType, subjectID uuid.UUID, permission Permission) error {
 	entry, err := entity.NewACLEntry(
-		string(resourceType),
+		resourceType,
 		resourceID,
 		string(subjectType),
 		subjectID,
-		string(permission),
+		entity.ACLPermission(permission),
 	)
 	if err != nil {
 		return err
@@ -148,12 +139,12 @@ func (c *Checker) RevokeAccess(ctx context.Context, entryID uuid.UUID) error {
 }
 
 // RevokeAllAccess revokes all permissions for a resource.
-func (c *Checker) RevokeAllAccess(ctx context.Context, resourceType ResourceType, resourceID uuid.UUID) error {
+func (c *Checker) RevokeAllAccess(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) error {
 	return c.aclRepo.DeleteByResource(ctx, string(resourceType), resourceID)
 }
 
 // GetResourcePermissions gets all ACL entries for a resource.
-func (c *Checker) GetResourcePermissions(ctx context.Context, resourceType ResourceType, resourceID uuid.UUID) ([]*entity.ACLEntry, error) {
+func (c *Checker) GetResourcePermissions(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) ([]*entity.ACLEntry, error) {
 	return c.aclRepo.FindByResource(ctx, string(resourceType), resourceID)
 }
 

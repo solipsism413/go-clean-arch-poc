@@ -29,21 +29,54 @@ func NewRoleRepository(pool *pgxpool.Pool) *RoleRepository {
 	}
 }
 
-// Save creates a new role.
+// Save creates or updates a role with its permissions.
 func (r *RoleRepository) Save(ctx context.Context, role *entity.Role) error {
 	var desc *string
 	if role.Description != "" {
 		desc = &role.Description
 	}
 
-	_, err := r.queries.CreateRole(ctx, sqlc.CreateRoleParams{
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := r.queries.WithTx(tx)
+
+	_, err = qtx.UpsertRole(ctx, sqlc.UpsertRoleParams{
 		ID:          role.ID,
 		Name:        role.Name,
 		Description: desc,
 		CreatedAt:   role.CreatedAt,
 		UpdatedAt:   role.UpdatedAt,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, perm := range role.Permissions {
+		pRow, err := qtx.UpsertPermission(ctx, sqlc.UpsertPermissionParams{
+			ID:        perm.ID,
+			Name:      perm.Name,
+			Resource:  string(perm.Resource),
+			Action:    string(perm.Action),
+			CreatedAt: perm.CreatedAt,
+		})
+		if err != nil {
+			return err
+		}
+
+		err = qtx.AddPermissionToRole(ctx, sqlc.AddPermissionToRoleParams{
+			RoleID:       role.ID,
+			PermissionID: pRow.ID,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 // Update updates an existing role.
@@ -88,8 +121,8 @@ func (r *RoleRepository) FindByID(ctx context.Context, id uuid.UUID) (*entity.Ro
 		role.Permissions = append(role.Permissions, entity.Permission{
 			ID:        permRow.ID,
 			Name:      permRow.Name,
-			Resource:  permRow.Resource,
-			Action:    permRow.Action,
+			Resource:  entity.ResourceType(permRow.Resource),
+			Action:    entity.PermissionAction(permRow.Action),
 			CreatedAt: permRow.CreatedAt,
 		})
 	}
@@ -110,7 +143,7 @@ func (r *RoleRepository) FindByName(ctx context.Context, name string) (*entity.R
 	return sqlcRoleToEntity(row), nil
 }
 
-// FindAll retrieves all roles.
+// FindAll retrieves all roles with their permissions.
 func (r *RoleRepository) FindAll(ctx context.Context) ([]*entity.Role, error) {
 	rows, err := r.queries.ListRoles(ctx)
 	if err != nil {
@@ -118,8 +151,33 @@ func (r *RoleRepository) FindAll(ctx context.Context) ([]*entity.Role, error) {
 	}
 
 	roles := make([]*entity.Role, 0, len(rows))
+	roleIDs := make([]uuid.UUID, 0, len(rows))
+	roleMap := make(map[uuid.UUID]*entity.Role)
+
 	for _, row := range rows {
-		roles = append(roles, sqlcRoleToEntity(row))
+		role := sqlcRoleToEntity(row)
+		roles = append(roles, role)
+		roleIDs = append(roleIDs, role.ID)
+		roleMap[role.ID] = role
+	}
+
+	if len(roleIDs) > 0 {
+		perms, err := r.queries.GetPermissionsByRoleIDs(ctx, roleIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range perms {
+			if role, ok := roleMap[p.RoleID]; ok {
+				role.Permissions = append(role.Permissions, entity.Permission{
+					ID:        p.ID,
+					Name:      p.Name,
+					Resource:  entity.ResourceType(p.Resource),
+					Action:    entity.PermissionAction(p.Action),
+					CreatedAt: p.CreatedAt,
+				})
+			}
+		}
 	}
 
 	return roles, nil
@@ -148,6 +206,21 @@ func (r *RoleRepository) ExistsByID(ctx context.Context, id uuid.UUID) (bool, er
 // ExistsByName checks if a role with the given name exists.
 func (r *RoleRepository) ExistsByName(ctx context.Context, name string) (bool, error) {
 	return r.queries.RoleExistsByName(ctx, name)
+}
+
+// DeleteByName removes a role by name.
+func (r *RoleRepository) DeleteByName(ctx context.Context, name string) error {
+	return r.queries.DeleteRoleByName(ctx, name)
+}
+
+// DeleteByNames removes multiple roles by their names.
+func (r *RoleRepository) DeleteByNames(ctx context.Context, names []string) error {
+	return r.queries.DeleteRolesByNames(ctx, names)
+}
+
+// RemoveAllPermissions removes all permissions from a role.
+func (r *RoleRepository) RemoveAllPermissions(ctx context.Context, roleID uuid.UUID) error {
+	return r.queries.RemoveAllPermissionsFromRole(ctx, roleID)
 }
 
 func sqlcRoleToEntity(row sqlc.Role) *entity.Role {
@@ -186,8 +259,8 @@ func (r *PermissionRepository) Save(ctx context.Context, permission *entity.Perm
 	_, err := r.queries.CreatePermission(ctx, sqlc.CreatePermissionParams{
 		ID:        permission.ID,
 		Name:      permission.Name,
-		Resource:  permission.Resource,
-		Action:    permission.Action,
+		Resource:  string(permission.Resource),
+		Action:    string(permission.Action),
 		CreatedAt: permission.CreatedAt,
 	})
 	return err
@@ -211,8 +284,8 @@ func (r *PermissionRepository) FindByID(ctx context.Context, id uuid.UUID) (*ent
 	return &entity.Permission{
 		ID:        row.ID,
 		Name:      row.Name,
-		Resource:  row.Resource,
-		Action:    row.Action,
+		Resource:  entity.ResourceType(row.Resource),
+		Action:    entity.PermissionAction(row.Action),
 		CreatedAt: row.CreatedAt,
 	}, nil
 }
@@ -229,8 +302,8 @@ func (r *PermissionRepository) FindAll(ctx context.Context) ([]*entity.Permissio
 		permissions = append(permissions, &entity.Permission{
 			ID:        row.ID,
 			Name:      row.Name,
-			Resource:  row.Resource,
-			Action:    row.Action,
+			Resource:  entity.ResourceType(row.Resource),
+			Action:    entity.PermissionAction(row.Action),
 			CreatedAt: row.CreatedAt,
 		})
 	}
@@ -250,8 +323,8 @@ func (r *PermissionRepository) FindByRoleID(ctx context.Context, roleID uuid.UUI
 		permissions = append(permissions, &entity.Permission{
 			ID:        row.ID,
 			Name:      row.Name,
-			Resource:  row.Resource,
-			Action:    row.Action,
+			Resource:  entity.ResourceType(row.Resource),
+			Action:    entity.PermissionAction(row.Action),
 			CreatedAt: row.CreatedAt,
 		})
 	}
@@ -262,4 +335,23 @@ func (r *PermissionRepository) FindByRoleID(ctx context.Context, roleID uuid.UUI
 // ExistsByID checks if a permission exists.
 func (r *PermissionRepository) ExistsByID(ctx context.Context, id uuid.UUID) (bool, error) {
 	return r.queries.PermissionExists(ctx, id)
+}
+
+// FindByName retrieves a permission by name.
+func (r *PermissionRepository) FindByName(ctx context.Context, name string) (*entity.Permission, error) {
+	row, err := r.queries.GetPermissionByName(ctx, name)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &entity.Permission{
+		ID:        row.ID,
+		Name:      row.Name,
+		Resource:  entity.ResourceType(row.Resource),
+		Action:    entity.PermissionAction(row.Action),
+		CreatedAt: row.CreatedAt,
+	}, nil
 }

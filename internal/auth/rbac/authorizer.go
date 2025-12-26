@@ -66,7 +66,7 @@ func (a *Authorizer) HasPermission(ctx context.Context, user *entity.User, resou
 	for _, role := range user.Roles {
 		// Check direct permissions
 		for _, perm := range role.Permissions {
-			if a.matchPermission(perm.Resource+":"+perm.Action, requiredPermission) {
+			if a.matchPermission(string(perm.Resource)+":"+string(perm.Action), requiredPermission) {
 				return true
 			}
 		}

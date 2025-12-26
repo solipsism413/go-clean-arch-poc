@@ -168,9 +168,17 @@ func (r *UserRepository) loadUserRoles(ctx context.Context, userID uuid.UUID) ([
 		return nil, err
 	}
 
+	if len(roleRows) == 0 {
+		return make([]entity.Role, 0), nil
+	}
+
+	roleIDs := make([]uuid.UUID, 0, len(roleRows))
+	roleMap := make(map[uuid.UUID]*entity.Role)
 	roles := make([]entity.Role, 0, len(roleRows))
+
 	for _, roleRow := range roleRows {
-		role := entity.Role{
+		roleIDs = append(roleIDs, roleRow.ID)
+		role := &entity.Role{
 			ID:          roleRow.ID,
 			Name:        roleRow.Name,
 			Permissions: make([]entity.Permission, 0),
@@ -180,24 +188,31 @@ func (r *UserRepository) loadUserRoles(ctx context.Context, userID uuid.UUID) ([
 		if roleRow.Description != nil {
 			role.Description = *roleRow.Description
 		}
+		roleMap[roleRow.ID] = role
+	}
 
-		// Load permissions for role
-		permRows, err := r.queries.GetRolePermissions(ctx, roleRow.ID)
-		if err != nil {
-			return nil, err
-		}
+	// Load permissions for all roles at once
+	permRows, err := r.queries.GetPermissionsByRoleIDs(ctx, roleIDs)
+	if err != nil {
+		return nil, err
+	}
 
-		for _, permRow := range permRows {
+	for _, permRow := range permRows {
+		if role, ok := roleMap[permRow.RoleID]; ok {
 			role.Permissions = append(role.Permissions, entity.Permission{
 				ID:        permRow.ID,
 				Name:      permRow.Name,
-				Resource:  permRow.Resource,
-				Action:    permRow.Action,
+				Resource:  entity.ResourceType(permRow.Resource),
+				Action:    entity.PermissionAction(permRow.Action),
 				CreatedAt: permRow.CreatedAt,
 			})
 		}
+	}
 
-		roles = append(roles, role)
+	for _, roleRow := range roleRows {
+		if role, ok := roleMap[roleRow.ID]; ok {
+			roles = append(roles, *role)
+		}
 	}
 
 	return roles, nil

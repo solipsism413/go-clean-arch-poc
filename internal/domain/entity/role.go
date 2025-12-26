@@ -68,13 +68,13 @@ func (r *Role) RemovePermission(permissionID uuid.UUID) {
 }
 
 // HasPermission checks if the role has the specified permission.
-func (r *Role) HasPermission(resource, action string) bool {
+func (r *Role) HasPermission(resource ResourceType, action PermissionAction) bool {
 	for _, p := range r.Permissions {
 		if p.Resource == resource && p.Action == action {
 			return true
 		}
 		// Wildcard support
-		if p.Resource == "*" || (p.Resource == resource && p.Action == "*") {
+		if p.Resource == ResourceTypeAll || (p.Resource == resource && p.Action == PermissionActionAll) {
 			return true
 		}
 	}

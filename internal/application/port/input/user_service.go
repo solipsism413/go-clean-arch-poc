@@ -32,6 +32,9 @@ type UserService interface {
 
 	// RemoveRole removes a role from a user.
 	RemoveRole(ctx context.Context, userID, roleID uuid.UUID) (*dto.UserOutput, error)
+
+	// SeedSystemRoles seeds system-defined roles.
+	SeedSystemRoles(ctx context.Context) error
 }
 
 // AuthService defines the input port for authentication use cases.

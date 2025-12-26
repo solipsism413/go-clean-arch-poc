@@ -77,7 +77,7 @@ func (uc *AuthUseCase) Login(ctx context.Context, input dto.LoginInput) (*dto.Au
 	for _, role := range user.Roles {
 		roles = append(roles, role.Name)
 		for _, perm := range role.Permissions {
-			permissions = append(permissions, perm.Resource+":"+perm.Action)
+			permissions = append(permissions, string(perm.Resource)+":"+string(perm.Action))
 		}
 	}
 
@@ -147,7 +147,7 @@ func (uc *AuthUseCase) RefreshToken(ctx context.Context, refreshToken string) (*
 	for _, role := range user.Roles {
 		roles = append(roles, role.Name)
 		for _, perm := range role.Permissions {
-			permissions = append(permissions, perm.Resource+":"+perm.Action)
+			permissions = append(permissions, string(perm.Resource)+":"+string(perm.Action))
 		}
 	}
 

@@ -73,8 +73,8 @@ func PermissionFromEntity(permission *entity.Permission) *PermissionOutput {
 	return &PermissionOutput{
 		ID:        permission.ID,
 		Name:      permission.Name,
-		Resource:  permission.Resource,
-		Action:    permission.Action,
+		Resource:  string(permission.Resource),
+		Action:    string(permission.Action),
 		CreatedAt: permission.CreatedAt,
 	}
 }
@@ -141,11 +141,11 @@ func ACLEntryFromEntity(entry *entity.ACLEntry) *ACLEntryOutput {
 	}
 	return &ACLEntryOutput{
 		ID:           entry.ID,
-		ResourceType: entry.ResourceType,
+		ResourceType: string(entry.ResourceType),
 		ResourceID:   entry.ResourceID,
 		SubjectType:  entry.SubjectType,
 		SubjectID:    entry.SubjectID,
-		Permission:   entry.Permission,
+		Permission:   string(entry.Permission),
 		CreatedAt:    entry.CreatedAt,
 	}
 }

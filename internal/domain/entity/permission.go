@@ -6,6 +6,18 @@ import (
 	"github.com/google/uuid"
 )
 
+// PermissionAction represents the action allowed by a permission.
+type PermissionAction string
+
+const (
+	PermissionActionCreate PermissionAction = "create"
+	PermissionActionRead   PermissionAction = "read"
+	PermissionActionUpdate PermissionAction = "update"
+	PermissionActionDelete PermissionAction = "delete"
+	PermissionActionAssign PermissionAction = "assign"
+	PermissionActionAll    PermissionAction = "*"
+)
+
 // Permission represents a permission in the RBAC/ACL system.
 // Permissions define what actions can be performed on what resources.
 type Permission struct {
@@ -16,17 +28,17 @@ type Permission struct {
 	Name string
 
 	// Resource is the resource this permission applies to (e.g., "task", "user", "*").
-	Resource string
+	Resource ResourceType
 
 	// Action is the action this permission allows (e.g., "create", "read", "update", "delete", "*").
-	Action string
+	Action PermissionAction
 
 	// CreatedAt is the timestamp when the permission was created.
 	CreatedAt time.Time
 }
 
 // NewPermission creates a new Permission with the given parameters.
-func NewPermission(name, resource, action string) (*Permission, error) {
+func NewPermission(name string, resource ResourceType, action PermissionAction) (*Permission, error) {
 	if name == "" {
 		return nil, ErrEmptyPermissionName
 	}
@@ -48,13 +60,13 @@ func NewPermission(name, resource, action string) (*Permission, error) {
 
 // Matches checks if this permission matches the given resource and action.
 // Supports wildcard matching with "*".
-func (p *Permission) Matches(resource, action string) bool {
+func (p *Permission) Matches(resource ResourceType, action PermissionAction) bool {
 	resourceMatches := p.Resource == "*" || p.Resource == resource
-	actionMatches := p.Action == "*" || p.Action == action
+	actionMatches := p.Action == PermissionActionAll || p.Action == action
 	return resourceMatches && actionMatches
 }
 
 // String returns a string representation of the permission.
 func (p *Permission) String() string {
-	return p.Resource + ":" + p.Action
+	return string(p.Resource) + ":" + string(p.Action)
 }

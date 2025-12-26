@@ -68,6 +68,15 @@ type RoleRepository interface {
 
 	// ExistsByName checks if a role with the given name exists.
 	ExistsByName(ctx context.Context, name string) (bool, error)
+
+	// DeleteByName removes a role by name.
+	DeleteByName(ctx context.Context, name string) error
+
+	// DeleteByNames removes multiple roles by their names.
+	DeleteByNames(ctx context.Context, names []string) error
+
+	// RemoveAllPermissions removes all permissions from a role.
+	RemoveAllPermissions(ctx context.Context, roleID uuid.UUID) error
 }
 
 // PermissionRepository defines the output port for permission persistence.
@@ -89,6 +98,9 @@ type PermissionRepository interface {
 
 	// ExistsByID checks if a permission exists.
 	ExistsByID(ctx context.Context, id uuid.UUID) (bool, error)
+
+	// FindByName retrieves a permission by name.
+	FindByName(ctx context.Context, name string) (*entity.Permission, error)
 }
 
 // LabelRepository defines the output port for label persistence.

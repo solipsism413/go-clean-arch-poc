@@ -137,8 +137,8 @@ func (u *User) HasRole(roleName string) bool {
 }
 
 // HasPermission checks if the user has the specified permission.
-// The permission is checked against all roles assigned to the user.
-func (u *User) HasPermission(resource, action string) bool {
+// HasPermission checks if the user has a specific permission through their roles.
+func (u *User) HasPermission(resource ResourceType, action PermissionAction) bool {
 	for _, role := range u.Roles {
 		if role.HasPermission(resource, action) {
 			return true

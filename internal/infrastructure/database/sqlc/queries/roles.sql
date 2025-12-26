@@ -6,6 +6,19 @@ INSERT INTO roles (
 )
 RETURNING *;
 
+-- name: UpsertRole :one
+INSERT INTO roles (
+    id, name, description, created_at, updated_at
+) VALUES (
+    $1, $2, $3, $4, $5
+)
+ON CONFLICT (name) DO UPDATE
+SET 
+    description = EXCLUDED.description,
+    updated_at = EXCLUDED.updated_at
+RETURNING *;
+
+
 -- name: GetRole :one
 SELECT * FROM roles
 WHERE id = $1;
@@ -31,6 +44,16 @@ RETURNING *;
 DELETE FROM roles
 WHERE id = $1;
 
+-- name: DeleteRoleByName :exec
+DELETE FROM roles
+WHERE name = $1;
+
+-- name: DeleteRolesByNames :exec
+DELETE FROM roles
+WHERE name = ANY($1::text[]);
+
+
+
 -- name: RoleExists :one
 SELECT EXISTS(SELECT 1 FROM roles WHERE id = $1);
 
@@ -45,9 +68,26 @@ INSERT INTO permissions (
 )
 RETURNING *;
 
+-- name: UpsertPermission :one
+INSERT INTO permissions (
+    id, name, resource, action, created_at
+) VALUES (
+    $1, $2, $3, $4, $5
+)
+ON CONFLICT (name) DO UPDATE
+SET 
+    resource = EXCLUDED.resource,
+    action = EXCLUDED.action
+RETURNING *;
+
+
 -- name: GetPermission :one
 SELECT * FROM permissions
 WHERE id = $1;
+
+-- name: GetPermissionByName :one
+SELECT * FROM permissions
+WHERE name = $1;
 
 -- name: ListPermissions :many
 SELECT * FROM permissions
@@ -83,7 +123,18 @@ ON CONFLICT DO NOTHING;
 DELETE FROM role_permissions
 WHERE role_id = $1 AND permission_id = $2;
 
+-- name: RemoveAllPermissionsFromRole :exec
+DELETE FROM role_permissions
+WHERE role_id = $1;
+
+
 -- name: GetRolePermissions :many
 SELECT p.* FROM permissions p
 JOIN role_permissions rp ON p.id = rp.permission_id
 WHERE rp.role_id = $1;
+
+-- name: GetPermissionsByRoleIDs :many
+SELECT rp.role_id, p.* FROM permissions p
+JOIN role_permissions rp ON p.id = rp.permission_id
+WHERE rp.role_id = ANY($1::uuid[]);
+

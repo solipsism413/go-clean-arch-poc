@@ -6,6 +6,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// ACLPermission represents the permission granted in an ACL entry.
+type ACLPermission string
+
+const (
+	ACLPermissionRead   ACLPermission = "read"
+	ACLPermissionWrite  ACLPermission = "write"
+	ACLPermissionDelete ACLPermission = "delete"
+	ACLPermissionAdmin  ACLPermission = "admin"
+)
+
 // ACLEntry represents an Access Control List entry for fine-grained permissions.
 // ACL entries define permissions on specific resources for specific subjects.
 type ACLEntry struct {
@@ -13,7 +23,7 @@ type ACLEntry struct {
 	ID uuid.UUID
 
 	// ResourceType is the type of resource (e.g., "task", "project").
-	ResourceType string
+	ResourceType ResourceType
 
 	// ResourceID is the ID of the specific resource.
 	ResourceID uuid.UUID
@@ -25,14 +35,14 @@ type ACLEntry struct {
 	SubjectID uuid.UUID
 
 	// Permission is the permission granted (e.g., "read", "write", "delete", "admin").
-	Permission string
+	Permission ACLPermission
 
 	// CreatedAt is the timestamp when the ACL entry was created.
 	CreatedAt time.Time
 }
 
 // NewACLEntry creates a new ACLEntry with the given parameters.
-func NewACLEntry(resourceType string, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission string) (*ACLEntry, error) {
+func NewACLEntry(resourceType ResourceType, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission ACLPermission) (*ACLEntry, error) {
 	if resourceType == "" {
 		return nil, ErrEmptyResourceType
 	}
@@ -55,18 +65,18 @@ func NewACLEntry(resourceType string, resourceID uuid.UUID, subjectType string, 
 }
 
 // Matches checks if this ACL entry matches the given parameters.
-func (a *ACLEntry) Matches(resourceType string, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission string) bool {
+func (a *ACLEntry) Matches(resourceType ResourceType, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission ACLPermission) bool {
 	return a.ResourceType == resourceType &&
 		a.ResourceID == resourceID &&
 		a.SubjectType == subjectType &&
 		a.SubjectID == subjectID &&
-		(a.Permission == permission || a.Permission == "admin")
+		(a.Permission == permission || a.Permission == ACLPermissionAdmin)
 }
 
 // GrantsPermission checks if this ACL entry grants the specified permission.
 // Admin permission grants all other permissions.
-func (a *ACLEntry) GrantsPermission(permission string) bool {
-	if a.Permission == "admin" {
+func (a *ACLEntry) GrantsPermission(permission ACLPermission) bool {
+	if a.Permission == ACLPermissionAdmin {
 		return true
 	}
 	return a.Permission == permission

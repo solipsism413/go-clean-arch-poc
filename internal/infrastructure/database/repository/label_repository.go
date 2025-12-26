@@ -143,11 +143,11 @@ func NewACLRepository(pool *pgxpool.Pool) *ACLRepository {
 func (r *ACLRepository) Save(ctx context.Context, entry *entity.ACLEntry) error {
 	_, err := r.queries.CreateACLEntry(ctx, sqlc.CreateACLEntryParams{
 		ID:           entry.ID,
-		ResourceType: entry.ResourceType,
+		ResourceType: string(entry.ResourceType),
 		ResourceID:   entry.ResourceID,
 		SubjectType:  entry.SubjectType,
 		SubjectID:    entry.SubjectID,
-		Permission:   entry.Permission,
+		Permission:   string(entry.Permission),
 		CreatedAt:    entry.CreatedAt,
 	})
 	return err
@@ -172,11 +172,11 @@ func (r *ACLRepository) FindByResource(ctx context.Context, resourceType string,
 	for _, row := range rows {
 		entries = append(entries, &entity.ACLEntry{
 			ID:           row.ID,
-			ResourceType: row.ResourceType,
+			ResourceType: entity.ResourceType(row.ResourceType),
 			ResourceID:   row.ResourceID,
 			SubjectType:  row.SubjectType,
 			SubjectID:    row.SubjectID,
-			Permission:   row.Permission,
+			Permission:   entity.ACLPermission(row.Permission),
 			CreatedAt:    row.CreatedAt,
 		})
 	}
@@ -198,11 +198,11 @@ func (r *ACLRepository) FindBySubject(ctx context.Context, subjectType string, s
 	for _, row := range rows {
 		entries = append(entries, &entity.ACLEntry{
 			ID:           row.ID,
-			ResourceType: row.ResourceType,
+			ResourceType: entity.ResourceType(row.ResourceType),
 			ResourceID:   row.ResourceID,
 			SubjectType:  row.SubjectType,
 			SubjectID:    row.SubjectID,
-			Permission:   row.Permission,
+			Permission:   entity.ACLPermission(row.Permission),
 			CreatedAt:    row.CreatedAt,
 		})
 	}
@@ -217,7 +217,7 @@ func (r *ACLRepository) HasPermission(ctx context.Context, resourceType string, 
 		ResourceID:   resourceID,
 		SubjectType:  subjectType,
 		SubjectID:    subjectID,
-		Permission:   permission,
+		Permission:   string(permission),
 	})
 }
 

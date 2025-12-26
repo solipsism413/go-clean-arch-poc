@@ -127,6 +127,13 @@ func main() {
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tokenService, v, log)
 
+	// Seed system roles
+	if err := userService.SeedSystemRoles(ctx); err != nil {
+		log.Error("failed to seed system roles", "error", err)
+		os.Exit(1)
+	}
+	log.Info("system roles seeded successfully")
+
 	// =====================
 	// Initialize WebSocket
 	// =====================
