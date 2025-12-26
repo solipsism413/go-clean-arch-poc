@@ -26,7 +26,7 @@ type TaskUseCase struct {
 	labelRepo      output.LabelRepository
 	cache          output.CacheRepository
 	eventPublisher output.EventPublisher
-	validator      *validation.Validator
+	validator      validation.Validator
 	logger         *slog.Logger
 }
 
@@ -37,6 +37,7 @@ func NewTaskUseCase(
 	labelRepo output.LabelRepository,
 	cache output.CacheRepository,
 	eventPublisher output.EventPublisher,
+	validator validation.Validator,
 	logger *slog.Logger,
 ) *TaskUseCase {
 	return &TaskUseCase{
@@ -45,7 +46,7 @@ func NewTaskUseCase(
 		labelRepo:      labelRepo,
 		cache:          cache,
 		eventPublisher: eventPublisher,
-		validator:      validation.GetValidator(),
+		validator:      validator,
 		logger:         logger,
 	}
 }

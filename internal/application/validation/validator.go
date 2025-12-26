@@ -9,18 +9,24 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// Validator wraps the go-playground validator with custom validations.
-type Validator struct {
+// Validator defines the interface for data validation.
+type Validator interface {
+	Validate(data any) error
+	ValidateVar(field any, tag string) error
+}
+
+// StructValidator wraps the go-playground validator with custom validations.
+type StructValidator struct {
 	validate *validator.Validate
 }
 
 var (
-	instance *Validator
+	instance *StructValidator
 	once     sync.Once
 )
 
 // GetValidator returns a singleton validator instance.
-func GetValidator() *Validator {
+func GetValidator() *StructValidator {
 	once.Do(func() {
 		v := validator.New()
 
@@ -36,13 +42,13 @@ func GetValidator() *Validator {
 		// Register custom validations
 		registerCustomValidations(v)
 
-		instance = &Validator{validate: v}
+		instance = &StructValidator{validate: v}
 	})
 	return instance
 }
 
 // Validate validates a struct and returns validation errors.
-func (v *Validator) Validate(data any) error {
+func (v *StructValidator) Validate(data any) error {
 	err := v.validate.Struct(data)
 	if err == nil {
 		return nil
@@ -57,7 +63,7 @@ func (v *Validator) Validate(data any) error {
 }
 
 // ValidateVar validates a single variable.
-func (v *Validator) ValidateVar(field any, tag string) error {
+func (v *StructValidator) ValidateVar(field any, tag string) error {
 	return v.validate.Var(field, tag)
 }
 

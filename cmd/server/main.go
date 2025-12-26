@@ -14,6 +14,7 @@ import (
 	authUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
 	taskUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
+	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/auth/jwt"
 	redisCache "github.com/handiism/go-clean-arch-poc/internal/infrastructure/cache/redis"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
@@ -118,10 +119,13 @@ func main() {
 	aclRepo := repository.NewACLRepository(db.Pool)
 	_ = aclRepo // Keep reference for authorization
 
+	// Initialize validator
+	v := validation.GetValidator()
+
 	// Initialize use cases
-	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, log)
-	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, log)
-	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tokenService, log)
+	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, v, log)
+	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, v, log)
+	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tokenService, v, log)
 
 	// =====================
 	// Initialize WebSocket

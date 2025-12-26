@@ -25,7 +25,7 @@ type UserUseCase struct {
 	roleRepo       output.RoleRepository
 	cache          output.CacheRepository
 	eventPublisher output.EventPublisher
-	validator      *validation.Validator
+	validator      validation.Validator
 	logger         *slog.Logger
 }
 
@@ -35,6 +35,7 @@ func NewUserUseCase(
 	roleRepo output.RoleRepository,
 	cache output.CacheRepository,
 	eventPublisher output.EventPublisher,
+	validator validation.Validator,
 	logger *slog.Logger,
 ) *UserUseCase {
 	return &UserUseCase{
@@ -42,7 +43,7 @@ func NewUserUseCase(
 		roleRepo:       roleRepo,
 		cache:          cache,
 		eventPublisher: eventPublisher,
-		validator:      validation.GetValidator(),
+		validator:      validator,
 		logger:         logger,
 	}
 }
