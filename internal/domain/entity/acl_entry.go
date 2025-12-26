@@ -16,6 +16,14 @@ const (
 	ACLPermissionAdmin  ACLPermission = "admin"
 )
 
+// ACLSubjectType represents the type of subject in an ACL entry.
+type ACLSubjectType string
+
+const (
+	ACLSubjectTypeUser ACLSubjectType = "user"
+	ACLSubjectTypeRole ACLSubjectType = "role"
+)
+
 // ACLEntry represents an Access Control List entry for fine-grained permissions.
 // ACL entries define permissions on specific resources for specific subjects.
 type ACLEntry struct {
@@ -29,7 +37,7 @@ type ACLEntry struct {
 	ResourceID uuid.UUID
 
 	// SubjectType is the type of subject (e.g., "user", "role").
-	SubjectType string
+	SubjectType ACLSubjectType
 
 	// SubjectID is the ID of the subject.
 	SubjectID uuid.UUID
@@ -42,7 +50,7 @@ type ACLEntry struct {
 }
 
 // NewACLEntry creates a new ACLEntry with the given parameters.
-func NewACLEntry(resourceType ResourceType, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission ACLPermission) (*ACLEntry, error) {
+func NewACLEntry(resourceType ResourceType, resourceID uuid.UUID, subjectType ACLSubjectType, subjectID uuid.UUID, permission ACLPermission) (*ACLEntry, error) {
 	if resourceType == "" {
 		return nil, ErrEmptyResourceType
 	}
@@ -65,7 +73,7 @@ func NewACLEntry(resourceType ResourceType, resourceID uuid.UUID, subjectType st
 }
 
 // Matches checks if this ACL entry matches the given parameters.
-func (a *ACLEntry) Matches(resourceType ResourceType, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission ACLPermission) bool {
+func (a *ACLEntry) Matches(resourceType ResourceType, resourceID uuid.UUID, subjectType ACLSubjectType, subjectID uuid.UUID, permission ACLPermission) bool {
 	return a.ResourceType == resourceType &&
 		a.ResourceID == resourceID &&
 		a.SubjectType == subjectType &&

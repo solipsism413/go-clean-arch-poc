@@ -73,16 +73,18 @@ func (uc *AuthUseCase) Login(ctx context.Context, input dto.LoginInput) (*dto.Au
 
 	// Extract roles and permissions
 	roles := make([]string, 0, len(user.Roles))
+	roleIDs := make([]uuid.UUID, 0, len(user.Roles))
 	permissions := make([]string, 0)
 	for _, role := range user.Roles {
 		roles = append(roles, role.Name)
+		roleIDs = append(roleIDs, role.ID)
 		for _, perm := range role.Permissions {
 			permissions = append(permissions, string(perm.Resource)+":"+string(perm.Action))
 		}
 	}
 
 	// Generate tokens
-	authOutput, err := uc.tokenService.GenerateTokenPair(ctx, user.ID, user.Email, roles, permissions)
+	authOutput, err := uc.tokenService.GenerateTokenPair(ctx, user.ID, user.Email, roles, roleIDs, permissions)
 	if err != nil {
 		return nil, err
 	}
@@ -143,16 +145,18 @@ func (uc *AuthUseCase) RefreshToken(ctx context.Context, refreshToken string) (*
 
 	// Extract roles and permissions
 	roles := make([]string, 0, len(user.Roles))
+	roleIDs := make([]uuid.UUID, 0, len(user.Roles))
 	permissions := make([]string, 0)
 	for _, role := range user.Roles {
 		roles = append(roles, role.Name)
+		roleIDs = append(roleIDs, role.ID)
 		for _, perm := range role.Permissions {
 			permissions = append(permissions, string(perm.Resource)+":"+string(perm.Action))
 		}
 	}
 
 	// Generate new tokens
-	authOutput, err := uc.tokenService.GenerateTokenPair(ctx, user.ID, user.Email, roles, permissions)
+	authOutput, err := uc.tokenService.GenerateTokenPair(ctx, user.ID, user.Email, roles, roleIDs, permissions)
 	if err != nil {
 		return nil, err
 	}

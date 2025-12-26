@@ -39,14 +39,15 @@ func NewTokenService(cfg config.JWTConfig) *TokenService {
 // Claims represents the JWT claims.
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID      uuid.UUID `json:"userId"`
-	Email       string    `json:"email"`
-	Roles       []string  `json:"roles"`
-	Permissions []string  `json:"permissions"`
+	UserID      uuid.UUID   `json:"userId"`
+	Email       string      `json:"email"`
+	Roles       []string    `json:"roles"`
+	RoleIDs     []uuid.UUID `json:"roleIds"`
+	Permissions []string    `json:"permissions"`
 }
 
 // GenerateTokenPair generates an access token and refresh token pair.
-func (s *TokenService) GenerateTokenPair(ctx context.Context, userID uuid.UUID, email string, roles, permissions []string) (*dto.AuthOutput, error) {
+func (s *TokenService) GenerateTokenPair(ctx context.Context, userID uuid.UUID, email string, roles []string, roleIDs []uuid.UUID, permissions []string) (*dto.AuthOutput, error) {
 	now := time.Now()
 	accessExpiry := now.Add(s.accessTokenTTL)
 	refreshExpiry := now.Add(s.refreshTokenTTL)
@@ -64,6 +65,7 @@ func (s *TokenService) GenerateTokenPair(ctx context.Context, userID uuid.UUID, 
 		UserID:      userID,
 		Email:       email,
 		Roles:       roles,
+		RoleIDs:     roleIDs,
 		Permissions: permissions,
 	}
 
@@ -121,6 +123,7 @@ func (s *TokenService) ValidateToken(ctx context.Context, tokenString string) (*
 		UserID:      claims.UserID,
 		Email:       claims.Email,
 		Roles:       claims.Roles,
+		RoleIDs:     claims.RoleIDs,
 		Permissions: claims.Permissions,
 		ExpiresAt:   claims.ExpiresAt.Time,
 	}, nil

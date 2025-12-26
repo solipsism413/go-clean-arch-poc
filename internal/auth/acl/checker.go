@@ -10,21 +10,21 @@ import (
 )
 
 // SubjectType defines types of subjects that can be granted permissions.
-type SubjectType string
+type SubjectType = entity.ACLSubjectType
 
 const (
-	SubjectTypeUser SubjectType = "user"
-	SubjectTypeRole SubjectType = "role"
+	SubjectTypeUser = entity.ACLSubjectTypeUser
+	SubjectTypeRole = entity.ACLSubjectTypeRole
 )
 
 // Permission defines ACL permission levels.
-type Permission string
+type Permission = entity.ACLPermission
 
 const (
-	PermissionRead   Permission = "read"
-	PermissionWrite  Permission = "write"
-	PermissionDelete Permission = "delete"
-	PermissionAdmin  Permission = "admin"
+	PermissionRead   = entity.ACLPermissionRead
+	PermissionWrite  = entity.ACLPermissionWrite
+	PermissionDelete = entity.ACLPermissionDelete
+	PermissionAdmin  = entity.ACLPermissionAdmin
 )
 
 // Checker provides ACL authorization checks.
@@ -40,19 +40,19 @@ func NewChecker(aclRepo output.ACLRepository) *Checker {
 }
 
 // CanAccess checks if a user has the specified permission on a resource.
-func (c *Checker) CanAccess(ctx context.Context, user *entity.User, resourceType entity.ResourceType, resourceID uuid.UUID, permission Permission) (bool, error) {
-	if user == nil {
+func (c *Checker) CanAccess(ctx context.Context, userID uuid.UUID, roleIDs []uuid.UUID, resourceType entity.ResourceType, resourceID uuid.UUID, permission Permission) (bool, error) {
+	if userID == uuid.Nil {
 		return false, nil
 	}
 
 	// Check direct user permission
 	hasPermission, err := c.aclRepo.HasPermission(
 		ctx,
-		string(resourceType),
+		resourceType,
 		resourceID,
-		string(SubjectTypeUser),
-		user.ID,
-		string(permission),
+		SubjectTypeUser,
+		userID,
+		permission,
 	)
 	if err != nil {
 		return false, err
@@ -65,11 +65,11 @@ func (c *Checker) CanAccess(ctx context.Context, user *entity.User, resourceType
 	if permission != PermissionAdmin {
 		hasAdmin, err := c.aclRepo.HasPermission(
 			ctx,
-			string(resourceType),
+			resourceType,
 			resourceID,
-			string(SubjectTypeUser),
-			user.ID,
-			string(PermissionAdmin),
+			SubjectTypeUser,
+			userID,
+			PermissionAdmin,
 		)
 		if err != nil {
 			return false, err
@@ -80,14 +80,14 @@ func (c *Checker) CanAccess(ctx context.Context, user *entity.User, resourceType
 	}
 
 	// Check role-based permissions
-	for _, role := range user.Roles {
+	for _, roleID := range roleIDs {
 		hasRolePermission, err := c.aclRepo.HasPermission(
 			ctx,
-			string(resourceType),
+			resourceType,
 			resourceID,
-			string(SubjectTypeRole),
-			role.ID,
-			string(permission),
+			SubjectTypeRole,
+			roleID,
+			permission,
 		)
 		if err != nil {
 			return false, err
@@ -100,11 +100,11 @@ func (c *Checker) CanAccess(ctx context.Context, user *entity.User, resourceType
 		if permission != PermissionAdmin {
 			hasRoleAdmin, err := c.aclRepo.HasPermission(
 				ctx,
-				string(resourceType),
+				resourceType,
 				resourceID,
-				string(SubjectTypeRole),
-				role.ID,
-				string(PermissionAdmin),
+				SubjectTypeRole,
+				roleID,
+				PermissionAdmin,
 			)
 			if err != nil {
 				return false, err
@@ -123,9 +123,9 @@ func (c *Checker) GrantAccess(ctx context.Context, resourceType entity.ResourceT
 	entry, err := entity.NewACLEntry(
 		resourceType,
 		resourceID,
-		string(subjectType),
+		subjectType,
 		subjectID,
-		entity.ACLPermission(permission),
+		permission,
 	)
 	if err != nil {
 		return err
@@ -140,15 +140,15 @@ func (c *Checker) RevokeAccess(ctx context.Context, entryID uuid.UUID) error {
 
 // RevokeAllAccess revokes all permissions for a resource.
 func (c *Checker) RevokeAllAccess(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) error {
-	return c.aclRepo.DeleteByResource(ctx, string(resourceType), resourceID)
+	return c.aclRepo.DeleteByResource(ctx, resourceType, resourceID)
 }
 
 // GetResourcePermissions gets all ACL entries for a resource.
 func (c *Checker) GetResourcePermissions(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) ([]*entity.ACLEntry, error) {
-	return c.aclRepo.FindByResource(ctx, string(resourceType), resourceID)
+	return c.aclRepo.FindByResource(ctx, resourceType, resourceID)
 }
 
 // GetUserPermissions gets all ACL entries for a user.
 func (c *Checker) GetUserPermissions(ctx context.Context, userID uuid.UUID) ([]*entity.ACLEntry, error) {
-	return c.aclRepo.FindBySubject(ctx, string(SubjectTypeUser), userID)
+	return c.aclRepo.FindBySubject(ctx, SubjectTypeUser, userID)
 }

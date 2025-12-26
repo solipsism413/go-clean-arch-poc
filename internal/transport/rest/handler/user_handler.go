@@ -8,6 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
+	"github.com/handiism/go-clean-arch-poc/internal/auth"
+	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/middleware"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 )
@@ -15,13 +18,15 @@ import (
 // UserHandler handles user-related HTTP requests.
 type UserHandler struct {
 	userService input.UserService
+	aclChecker  *acl.Checker
 	logger      *slog.Logger
 }
 
 // NewUserHandler creates a new UserHandler.
-func NewUserHandler(userService input.UserService, logger *slog.Logger) *UserHandler {
+func NewUserHandler(userService input.UserService, aclChecker *acl.Checker, logger *slog.Logger) *UserHandler {
 	return &UserHandler{
 		userService: userService,
+		aclChecker:  aclChecker,
 		logger:      logger,
 	}
 }
@@ -48,6 +53,10 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid user ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionRead) {
 		return
 	}
 
@@ -85,6 +94,10 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
 	var input dto.UpdateUserInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid request body", err)
@@ -105,6 +118,10 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid user ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionDelete) {
 		return
 	}
 
@@ -160,4 +177,27 @@ func (h *UserHandler) RemoveRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	presenter.JSON(w, http.StatusOK, user)
+}
+
+// checkACL is a helper method to perform manual ACL checks in handlers.
+func (h *UserHandler) checkACL(w http.ResponseWriter, r *http.Request, resourceID uuid.UUID, permission acl.Permission) bool {
+	claims := auth.GetClaimsFromContext(r.Context())
+	if claims == nil {
+		presenter.Error(w, http.StatusUnauthorized, "Authentication required", nil)
+		return false
+	}
+
+	hasAccess, err := h.aclChecker.CanAccess(r.Context(), claims.UserID, claims.RoleIDs, entity.ResourceTypeUser, resourceID, permission)
+	if err != nil {
+		h.logger.Error("failed to check ACL access", "error", err, "userId", resourceID, "actorId", claims.UserID)
+		presenter.Error(w, http.StatusInternalServerError, "Internal server error", nil)
+		return false
+	}
+
+	if !hasAccess {
+		presenter.Error(w, http.StatusForbidden, "You do not have permission for this user", nil)
+		return false
+	}
+
+	return true
 }

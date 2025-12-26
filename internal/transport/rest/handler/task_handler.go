@@ -10,6 +10,9 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
+	"github.com/handiism/go-clean-arch-poc/internal/auth"
+	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	domainerror "github.com/handiism/go-clean-arch-poc/internal/domain/error"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 )
@@ -17,13 +20,15 @@ import (
 // TaskHandler handles task-related HTTP requests.
 type TaskHandler struct {
 	taskService input.TaskService
+	aclChecker  *acl.Checker
 	logger      *slog.Logger
 }
 
 // NewTaskHandler creates a new TaskHandler.
-func NewTaskHandler(taskService input.TaskService, logger *slog.Logger) *TaskHandler {
+func NewTaskHandler(taskService input.TaskService, aclChecker *acl.Checker, logger *slog.Logger) *TaskHandler {
 	return &TaskHandler{
 		taskService: taskService,
+		aclChecker:  aclChecker,
 		logger:      logger,
 	}
 }
@@ -74,6 +79,10 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionRead) {
 		return
 	}
 
@@ -146,6 +155,10 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
 	var input dto.UpdateTaskInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid request body", err)
@@ -181,6 +194,10 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkACL(w, r, id, acl.PermissionDelete) {
+		return
+	}
+
 	if err := h.taskService.DeleteTask(r.Context(), id); err != nil {
 		handleError(w, err)
 		return
@@ -194,6 +211,10 @@ func (h *TaskHandler) Assign(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
 		return
 	}
 
@@ -222,6 +243,10 @@ func (h *TaskHandler) Unassign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
 	task, err := h.taskService.UnassignTask(r.Context(), id)
 	if err != nil {
 		handleError(w, err)
@@ -236,6 +261,10 @@ func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
 		return
 	}
 
@@ -256,6 +285,10 @@ func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
 	task, err := h.taskService.ArchiveTask(r.Context(), id)
 	if err != nil {
 		handleError(w, err)
@@ -270,6 +303,10 @@ func (h *TaskHandler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
 		return
 	}
 
@@ -298,6 +335,10 @@ func (h *TaskHandler) AddLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
 	labelID, err := uuid.Parse(r.PathValue("labelId"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid label ID", err)
@@ -321,6 +362,10 @@ func (h *TaskHandler) RemoveLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
 	labelID, err := uuid.Parse(r.PathValue("labelId"))
 	if err != nil {
 		presenter.Error(w, http.StatusBadRequest, "Invalid label ID", err)
@@ -334,6 +379,29 @@ func (h *TaskHandler) RemoveLabel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	presenter.JSON(w, http.StatusOK, task)
+}
+
+// checkACL is a helper method to perform manual ACL checks in handlers.
+func (h *TaskHandler) checkACL(w http.ResponseWriter, r *http.Request, resourceID uuid.UUID, permission acl.Permission) bool {
+	claims := auth.GetClaimsFromContext(r.Context())
+	if claims == nil {
+		presenter.Error(w, http.StatusUnauthorized, "Authentication required", nil)
+		return false
+	}
+
+	hasAccess, err := h.aclChecker.CanAccess(r.Context(), claims.UserID, claims.RoleIDs, entity.ResourceTypeTask, resourceID, permission)
+	if err != nil {
+		h.logger.Error("failed to check ACL access", "error", err, "taskId", resourceID, "userId", claims.UserID)
+		presenter.Error(w, http.StatusInternalServerError, "Internal server error", nil)
+		return false
+	}
+
+	if !hasAccess {
+		presenter.Error(w, http.StatusForbidden, "You do not have permission for this task", nil)
+		return false
+	}
+
+	return true
 }
 
 // handleError maps domain errors to HTTP responses.

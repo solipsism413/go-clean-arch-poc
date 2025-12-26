@@ -136,14 +136,14 @@ type ACLRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 
 	// FindByResource retrieves ACL entries for a specific resource.
-	FindByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) ([]*entity.ACLEntry, error)
+	FindByResource(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) ([]*entity.ACLEntry, error)
 
 	// FindBySubject retrieves ACL entries for a specific subject.
-	FindBySubject(ctx context.Context, subjectType string, subjectID uuid.UUID) ([]*entity.ACLEntry, error)
+	FindBySubject(ctx context.Context, subjectType entity.ACLSubjectType, subjectID uuid.UUID) ([]*entity.ACLEntry, error)
 
 	// HasPermission checks if a subject has a specific permission on a resource.
-	HasPermission(ctx context.Context, resourceType string, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission string) (bool, error)
+	HasPermission(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID, subjectType entity.ACLSubjectType, subjectID uuid.UUID, permission entity.ACLPermission) (bool, error)
 
 	// DeleteByResource removes all ACL entries for a resource.
-	DeleteByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) error
+	DeleteByResource(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) error
 }

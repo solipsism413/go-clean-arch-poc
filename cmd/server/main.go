@@ -15,6 +15,9 @@ import (
 	taskUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
+	"github.com/handiism/go-clean-arch-poc/internal/auth"
+	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
+	"github.com/handiism/go-clean-arch-poc/internal/auth/rbac"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/auth/jwt"
 	redisCache "github.com/handiism/go-clean-arch-poc/internal/infrastructure/cache/redis"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
@@ -116,7 +119,10 @@ func main() {
 	roleRepo := repository.NewRoleRepository(db.Pool)
 	labelRepo := repository.NewLabelRepository(db.Pool)
 	aclRepo := repository.NewACLRepository(db.Pool)
-	_ = aclRepo // Keep reference for authorization
+
+	// Initialize authorizer and ACL checker
+	authorizer := rbac.NewAuthorizer()
+	aclChecker := acl.NewChecker(aclRepo)
 
 	// Initialize validator
 	v := validation.NewValidator()
@@ -125,6 +131,9 @@ func main() {
 	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, v, log)
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tokenService, v, log)
+
+	// Initialize auth middleware
+	authMiddleware := auth.NewMiddleware(authService, userService, authorizer, aclChecker)
 
 	// Seed system roles
 	if err := userService.SeedSystemRoles(ctx); err != nil {
@@ -164,7 +173,7 @@ func main() {
 	// =====================
 	// Initialize REST Router
 	// =====================
-	router := rest.NewRouter(taskService, userService, authService, log)
+	router := rest.NewRouter(taskService, userService, authService, authMiddleware, aclChecker, log)
 
 	// Register WebSocket handler
 	router.Handle("GET /ws", websocket.NewHandler(wsHub, taskService, authService, log))

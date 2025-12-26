@@ -2,11 +2,15 @@
 package rest
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
+	"github.com/handiism/go-clean-arch-poc/internal/auth"
+	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/handler"
 	customMiddleware "github.com/handiism/go-clean-arch-poc/internal/transport/rest/middleware"
 
@@ -22,6 +26,7 @@ type Router struct {
 	userHandler      *handler.UserHandler
 	authHandler      *handler.AuthHandler
 	authService      input.AuthService
+	authMiddleware   *auth.Middleware
 	logger           *slog.Logger
 }
 
@@ -30,17 +35,20 @@ func NewRouter(
 	taskService input.TaskService,
 	userService input.UserService,
 	authService input.AuthService,
+	authMiddleware *auth.Middleware,
+	aclChecker *acl.Checker,
 	logger *slog.Logger,
 ) *Router {
 	mux := http.NewServeMux()
 
 	r := &Router{
 		mux:              mux,
-		taskHandler:      handler.NewTaskHandler(taskService, logger),
+		taskHandler:      handler.NewTaskHandler(taskService, aclChecker, logger),
 		taskQueryHandler: handler.NewTaskQueryHandler(taskService, logger),
-		userHandler:      handler.NewUserHandler(userService, logger),
+		userHandler:      handler.NewUserHandler(userService, aclChecker, logger),
 		authHandler:      handler.NewAuthHandler(authService, logger),
 		authService:      authService,
+		authMiddleware:   authMiddleware,
 		logger:           logger,
 	}
 
@@ -76,7 +84,7 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("GET /api/v1/tasks/search", r.withAuth(r.taskQueryHandler.Search))
 	r.mux.HandleFunc("GET /api/v1/tasks/overdue", r.withAuth(r.taskQueryHandler.Overdue))
 	r.mux.HandleFunc("GET /api/v1/tasks", r.withAuth(r.taskHandler.List))
-	r.mux.HandleFunc("POST /api/v1/tasks", r.withAuth(r.taskHandler.Create))
+	r.mux.HandleFunc("POST /api/v1/tasks", r.withPermission(entity.ResourceTypeTasks, entity.PermissionActionCreate, r.taskHandler.Create))
 	r.mux.HandleFunc("GET /api/v1/tasks/{id}", r.withAuth(r.taskHandler.Get))
 	r.mux.HandleFunc("PUT /api/v1/tasks/{id}", r.withAuth(r.taskHandler.Update))
 	r.mux.HandleFunc("DELETE /api/v1/tasks/{id}", r.withAuth(r.taskHandler.Delete))
@@ -89,13 +97,13 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("DELETE /api/v1/tasks/{id}/labels/{labelId}", r.withAuth(r.taskHandler.RemoveLabel))
 
 	// User routes (protected)
-	r.mux.HandleFunc("GET /api/v1/users", r.withAuth(r.userHandler.List))
+	r.mux.HandleFunc("GET /api/v1/users", r.withPermission(entity.ResourceTypeUsers, entity.PermissionActionRead, r.userHandler.List))
 	r.mux.HandleFunc("GET /api/v1/users/me", r.withAuth(r.userHandler.Me))
 	r.mux.HandleFunc("GET /api/v1/users/{id}", r.withAuth(r.userHandler.Get))
 	r.mux.HandleFunc("PUT /api/v1/users/{id}", r.withAuth(r.userHandler.Update))
 	r.mux.HandleFunc("DELETE /api/v1/users/{id}", r.withAuth(r.userHandler.Delete))
-	r.mux.HandleFunc("POST /api/v1/users/{id}/roles/{roleId}", r.withAuth(r.userHandler.AssignRole))
-	r.mux.HandleFunc("DELETE /api/v1/users/{id}/roles/{roleId}", r.withAuth(r.userHandler.RemoveRole))
+	r.mux.HandleFunc("POST /api/v1/users/{id}/roles/{roleId}", r.withPermission(entity.ResourceTypeUsers, entity.PermissionActionUpdate, r.userHandler.AssignRole))
+	r.mux.HandleFunc("DELETE /api/v1/users/{id}/roles/{roleId}", r.withPermission(entity.ResourceTypeUsers, entity.PermissionActionUpdate, r.userHandler.RemoveRole))
 }
 
 // withAuth wraps a handler with authentication middleware.
@@ -137,7 +145,19 @@ func (r *Router) withAuth(h http.HandlerFunc) http.HandlerFunc {
 		// Add user info to context
 		ctx := customMiddleware.SetUserContext(req.Context(), claims)
 
+		// Add claims to context using auth package key for its middleware
+		ctx = context.WithValue(ctx, auth.ClaimsContextKey, claims)
+
 		h(w, req.WithContext(ctx))
+	}
+}
+
+// withPermission wraps a handler with RBAC permission middleware.
+func (r *Router) withPermission(resource entity.ResourceType, action entity.PermissionAction, h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		permMiddleware := r.authMiddleware.RequirePermission(resource, action)
+		handler := permMiddleware(http.HandlerFunc(h))
+		r.withAuth(handler.ServeHTTP)(w, req)
 	}
 }
 

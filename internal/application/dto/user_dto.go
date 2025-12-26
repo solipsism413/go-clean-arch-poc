@@ -105,9 +105,10 @@ type ChangePasswordInput struct {
 
 // TokenClaims represents the claims extracted from a JWT token.
 type TokenClaims struct {
-	UserID      uuid.UUID `json:"userId"`
-	Email       string    `json:"email"`
-	Roles       []string  `json:"roles"`
-	Permissions []string  `json:"permissions"`
-	ExpiresAt   time.Time `json:"expiresAt"`
+	UserID      uuid.UUID   `json:"userId"`
+	Email       string      `json:"email"`
+	Roles       []string    `json:"roles"`
+	RoleIDs     []uuid.UUID `json:"roleIds"`
+	Permissions []string    `json:"permissions"`
+	ExpiresAt   time.Time   `json:"expiresAt"`
 }

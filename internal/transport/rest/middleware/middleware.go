@@ -21,6 +21,7 @@ const (
 	UserIDKey      ContextKey = "userID"
 	EmailKey       ContextKey = "email"
 	RolesKey       ContextKey = "roles"
+	RoleIDsKey     ContextKey = "roleIDs"
 	PermissionsKey ContextKey = "permissions"
 )
 
@@ -142,6 +143,7 @@ func SetUserContext(ctx context.Context, claims *dto.TokenClaims) context.Contex
 	ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
 	ctx = context.WithValue(ctx, EmailKey, claims.Email)
 	ctx = context.WithValue(ctx, RolesKey, claims.Roles)
+	ctx = context.WithValue(ctx, RoleIDsKey, claims.RoleIDs)
 	ctx = context.WithValue(ctx, PermissionsKey, claims.Permissions)
 	ctx = logger.SetUserID(ctx, claims.UserID.String())
 	return ctx
@@ -160,6 +162,15 @@ func GetUserRoles(ctx context.Context) []string {
 		return nil
 	}
 	return roles
+}
+
+// GetUserRoleIDs retrieves user role IDs from context.
+func GetUserRoleIDs(ctx context.Context) []uuid.UUID {
+	roleIDs, ok := ctx.Value(RoleIDsKey).([]uuid.UUID)
+	if !ok {
+		return nil
+	}
+	return roleIDs
 }
 
 // GetUserPermissions retrieves user permissions from context.

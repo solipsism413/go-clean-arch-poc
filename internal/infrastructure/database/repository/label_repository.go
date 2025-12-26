@@ -145,7 +145,7 @@ func (r *ACLRepository) Save(ctx context.Context, entry *entity.ACLEntry) error 
 		ID:           entry.ID,
 		ResourceType: string(entry.ResourceType),
 		ResourceID:   entry.ResourceID,
-		SubjectType:  entry.SubjectType,
+		SubjectType:  string(entry.SubjectType),
 		SubjectID:    entry.SubjectID,
 		Permission:   string(entry.Permission),
 		CreatedAt:    entry.CreatedAt,
@@ -159,9 +159,9 @@ func (r *ACLRepository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 // FindByResource retrieves ACL entries for a specific resource.
-func (r *ACLRepository) FindByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) ([]*entity.ACLEntry, error) {
+func (r *ACLRepository) FindByResource(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) ([]*entity.ACLEntry, error) {
 	rows, err := r.queries.GetACLEntriesByResource(ctx, sqlc.GetACLEntriesByResourceParams{
-		ResourceType: resourceType,
+		ResourceType: string(resourceType),
 		ResourceID:   resourceID,
 	})
 	if err != nil {
@@ -174,7 +174,7 @@ func (r *ACLRepository) FindByResource(ctx context.Context, resourceType string,
 			ID:           row.ID,
 			ResourceType: entity.ResourceType(row.ResourceType),
 			ResourceID:   row.ResourceID,
-			SubjectType:  row.SubjectType,
+			SubjectType:  entity.ACLSubjectType(row.SubjectType),
 			SubjectID:    row.SubjectID,
 			Permission:   entity.ACLPermission(row.Permission),
 			CreatedAt:    row.CreatedAt,
@@ -185,9 +185,9 @@ func (r *ACLRepository) FindByResource(ctx context.Context, resourceType string,
 }
 
 // FindBySubject retrieves ACL entries for a specific subject.
-func (r *ACLRepository) FindBySubject(ctx context.Context, subjectType string, subjectID uuid.UUID) ([]*entity.ACLEntry, error) {
+func (r *ACLRepository) FindBySubject(ctx context.Context, subjectType entity.ACLSubjectType, subjectID uuid.UUID) ([]*entity.ACLEntry, error) {
 	rows, err := r.queries.GetACLEntriesBySubject(ctx, sqlc.GetACLEntriesBySubjectParams{
-		SubjectType: subjectType,
+		SubjectType: string(subjectType),
 		SubjectID:   subjectID,
 	})
 	if err != nil {
@@ -200,7 +200,7 @@ func (r *ACLRepository) FindBySubject(ctx context.Context, subjectType string, s
 			ID:           row.ID,
 			ResourceType: entity.ResourceType(row.ResourceType),
 			ResourceID:   row.ResourceID,
-			SubjectType:  row.SubjectType,
+			SubjectType:  entity.ACLSubjectType(row.SubjectType),
 			SubjectID:    row.SubjectID,
 			Permission:   entity.ACLPermission(row.Permission),
 			CreatedAt:    row.CreatedAt,
@@ -211,20 +211,20 @@ func (r *ACLRepository) FindBySubject(ctx context.Context, subjectType string, s
 }
 
 // HasPermission checks if a subject has a specific permission on a resource.
-func (r *ACLRepository) HasPermission(ctx context.Context, resourceType string, resourceID uuid.UUID, subjectType string, subjectID uuid.UUID, permission string) (bool, error) {
+func (r *ACLRepository) HasPermission(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID, subjectType entity.ACLSubjectType, subjectID uuid.UUID, permission entity.ACLPermission) (bool, error) {
 	return r.queries.HasPermission(ctx, sqlc.HasPermissionParams{
-		ResourceType: resourceType,
+		ResourceType: string(resourceType),
 		ResourceID:   resourceID,
-		SubjectType:  subjectType,
+		SubjectType:  string(subjectType),
 		SubjectID:    subjectID,
 		Permission:   string(permission),
 	})
 }
 
 // DeleteByResource removes all ACL entries for a resource.
-func (r *ACLRepository) DeleteByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) error {
+func (r *ACLRepository) DeleteByResource(ctx context.Context, resourceType entity.ResourceType, resourceID uuid.UUID) error {
 	return r.queries.DeleteACLEntriesByResource(ctx, sqlc.DeleteACLEntriesByResourceParams{
-		ResourceType: resourceType,
+		ResourceType: string(resourceType),
 		ResourceID:   resourceID,
 	})
 }

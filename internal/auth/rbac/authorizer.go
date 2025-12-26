@@ -3,6 +3,7 @@ package rbac
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
@@ -60,17 +61,39 @@ func (a *Authorizer) HasPermission(ctx context.Context, user *entity.User, resou
 		return false
 	}
 
-	// Check user's roles
+	// Extract role names and permission strings from entity
+	roleNames := make([]string, 0, len(user.Roles))
+	permissions := make([]string, 0)
 	for _, role := range user.Roles {
-		// Check direct permissions (from database)
+		roleNames = append(roleNames, role.Name)
 		for _, perm := range role.Permissions {
-			if a.matchPermission(perm.Resource, perm.Action, resource, action) {
-				return true
-			}
+			permissions = append(permissions, string(perm.Resource)+":"+string(perm.Action))
 		}
+	}
 
-		// Check predefined role permissions (from policy)
-		if perms, ok := a.rolePermissions[role.Name]; ok {
+	return a.HasPermissionFromClaims(roleNames, permissions, resource, action)
+}
+
+// HasPermissionFromClaims checks if a user has a specific permission based on claims.
+func (a *Authorizer) HasPermissionFromClaims(roles []string, permissions []string, resource entity.ResourceType, action entity.PermissionAction) bool {
+	// Check direct permissions (from database, now in claims)
+	for _, p := range permissions {
+		// Split permission into resource and action
+		parts := strings.Split(p, ":")
+		if len(parts) != 2 {
+			continue
+		}
+		pResource := entity.ResourceType(parts[0])
+		pAction := entity.PermissionAction(parts[1])
+
+		if a.matchPermission(pResource, pAction, resource, action) {
+			return true
+		}
+	}
+
+	// Check predefined role permissions (from policy)
+	for _, roleName := range roles {
+		if perms, ok := a.rolePermissions[roleName]; ok {
 			for _, perm := range perms {
 				if a.matchPermission(perm.Resource, perm.Action, resource, action) {
 					return true
@@ -88,19 +111,42 @@ func (a *Authorizer) HasRole(ctx context.Context, user *entity.User, roleName st
 		return false
 	}
 
+	roleNames := make([]string, 0, len(user.Roles))
 	for _, role := range user.Roles {
-		if role.Name == roleName {
+		roleNames = append(roleNames, role.Name)
+	}
+
+	return a.HasRoleFromClaims(roleNames, roleName)
+}
+
+// HasRoleFromClaims checks if a user has a specific role based on claims.
+func (a *Authorizer) HasRoleFromClaims(roles []string, roleName string) bool {
+	for _, r := range roles {
+		if r == roleName {
 			return true
 		}
 	}
-
 	return false
 }
 
 // HasAnyRole checks if a user has any of the specified roles.
 func (a *Authorizer) HasAnyRole(ctx context.Context, user *entity.User, roleNames ...string) bool {
+	if user == nil {
+		return false
+	}
+
+	userRoles := make([]string, 0, len(user.Roles))
+	for _, role := range user.Roles {
+		userRoles = append(userRoles, role.Name)
+	}
+
+	return a.HasAnyRoleFromClaims(userRoles, roleNames...)
+}
+
+// HasAnyRoleFromClaims checks if a user has any of the specified roles based on claims.
+func (a *Authorizer) HasAnyRoleFromClaims(userRoles []string, roleNames ...string) bool {
 	for _, roleName := range roleNames {
-		if a.HasRole(ctx, user, roleName) {
+		if a.HasRoleFromClaims(userRoles, roleName) {
 			return true
 		}
 	}

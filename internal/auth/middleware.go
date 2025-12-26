@@ -6,20 +6,22 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
+	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
 	"github.com/handiism/go-clean-arch-poc/internal/auth/rbac"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 )
 
-// contextKey is a type for context keys.
-type contextKey string
+// ContextKey is a type for context keys.
+type ContextKey string
 
 const (
 	// UserContextKey is the context key for the authenticated user.
-	UserContextKey contextKey = "user"
+	UserContextKey ContextKey = "user"
 	// ClaimsContextKey is the context key for JWT claims.
-	ClaimsContextKey contextKey = "claims"
+	ClaimsContextKey ContextKey = "claims"
 )
 
 // Middleware provides authentication and authorization middleware.
@@ -27,14 +29,16 @@ type Middleware struct {
 	authService input.AuthService
 	userService input.UserService
 	authorizer  *rbac.Authorizer
+	aclChecker  *acl.Checker
 }
 
 // NewMiddleware creates a new auth middleware.
-func NewMiddleware(authService input.AuthService, userService input.UserService, authorizer *rbac.Authorizer) *Middleware {
+func NewMiddleware(authService input.AuthService, userService input.UserService, authorizer *rbac.Authorizer, aclChecker *acl.Checker) *Middleware {
 	return &Middleware{
 		authService: authService,
 		userService: userService,
 		authorizer:  authorizer,
+		aclChecker:  aclChecker,
 	}
 }
 
@@ -102,13 +106,13 @@ func (m *Middleware) AuthenticateOptional(next http.Handler) http.Handler {
 func (m *Middleware) RequirePermission(resource entity.ResourceType, action entity.PermissionAction) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := GetUserFromContext(r.Context())
-			if user == nil {
+			claims := GetClaimsFromContext(r.Context())
+			if claims == nil {
 				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
 				return
 			}
 
-			if !m.authorizer.HasPermission(r.Context(), user, resource, action) {
+			if !m.authorizer.HasPermissionFromClaims(claims.Roles, claims.Permissions, resource, action) {
 				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
 				return
 			}
@@ -122,13 +126,13 @@ func (m *Middleware) RequirePermission(resource entity.ResourceType, action enti
 func (m *Middleware) RequireRole(roleName string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := GetUserFromContext(r.Context())
-			if user == nil {
+			claims := GetClaimsFromContext(r.Context())
+			if claims == nil {
 				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
 				return
 			}
 
-			if !m.authorizer.HasRole(r.Context(), user, roleName) {
+			if !m.authorizer.HasRoleFromClaims(claims.Roles, roleName) {
 				http.Error(w, `{"error":"insufficient role"}`, http.StatusForbidden)
 				return
 			}
@@ -142,14 +146,53 @@ func (m *Middleware) RequireRole(roleName string) func(http.Handler) http.Handle
 func (m *Middleware) RequireAnyRole(roleNames ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := GetUserFromContext(r.Context())
-			if user == nil {
+			claims := GetClaimsFromContext(r.Context())
+			if claims == nil {
 				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
 				return
 			}
 
-			if !m.authorizer.HasAnyRole(r.Context(), user, roleNames...) {
+			if !m.authorizer.HasAnyRoleFromClaims(claims.Roles, roleNames...) {
 				http.Error(w, `{"error":"insufficient role"}`, http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireResourcePermission creates middleware that requires a specific ACL permission on a resource.
+func (m *Middleware) RequireResourcePermission(resourceType entity.ResourceType, permission acl.Permission, idParam string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims := GetClaimsFromContext(r.Context())
+			if claims == nil {
+				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+				return
+			}
+
+			// Get resource ID from path parameter
+			idStr := r.PathValue(idParam)
+			if idStr == "" {
+				http.Error(w, `{"error":"resource ID missing"}`, http.StatusBadRequest)
+				return
+			}
+
+			resourceID, err := uuid.Parse(idStr)
+			if err != nil {
+				http.Error(w, `{"error":"invalid resource ID"}`, http.StatusBadRequest)
+				return
+			}
+
+			hasAccess, err := m.aclChecker.CanAccess(r.Context(), claims.UserID, claims.RoleIDs, resourceType, resourceID, permission)
+			if err != nil {
+				http.Error(w, `{"error":"error checking access"}`, http.StatusInternalServerError)
+				return
+			}
+
+			if !hasAccess {
+				http.Error(w, `{"error":"insufficient permissions for this resource"}`, http.StatusForbidden)
 				return
 			}
 
