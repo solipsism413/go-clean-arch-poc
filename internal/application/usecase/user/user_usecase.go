@@ -25,6 +25,7 @@ type UserUseCase struct {
 	roleRepo       output.RoleRepository
 	cache          output.CacheRepository
 	eventPublisher output.EventPublisher
+	tm             output.TransactionManager
 	validator      validation.Validator
 	logger         *slog.Logger
 }
@@ -35,6 +36,7 @@ func NewUserUseCase(
 	roleRepo output.RoleRepository,
 	cache output.CacheRepository,
 	eventPublisher output.EventPublisher,
+	tm output.TransactionManager,
 	validator validation.Validator,
 	logger *slog.Logger,
 ) *UserUseCase {
@@ -43,6 +45,7 @@ func NewUserUseCase(
 		roleRepo:       roleRepo,
 		cache:          cache,
 		eventPublisher: eventPublisher,
+		tm:             tm,
 		validator:      validator,
 		logger:         logger,
 	}
@@ -317,147 +320,151 @@ func (uc *UserUseCase) RemoveRole(ctx context.Context, userID, roleID uuid.UUID)
 
 // SeedSystemRoles seeds system-defined roles and ensures they are in sync with the database.
 func (uc *UserUseCase) SeedSystemRoles(ctx context.Context) error {
-	uc.logger.Info("seeding system roles...")
+	return uc.tm.RunInTransaction(ctx, func(uow output.UnitOfWork) error {
+		uc.logger.Info("seeding system roles...")
 
-	// 1. Define desired roles state
-	desiredRoles := []struct {
-		Name        string
-		Description string
-		Permissions []struct {
-			Resource entity.ResourceType
-			Action   entity.PermissionAction
+		roleRepo := uow.RoleRepository()
+
+		// 1. Define desired roles state
+		desiredRoles := []struct {
+			Name        string
+			Description string
+			Permissions []struct {
+				Resource entity.ResourceType
+				Action   entity.PermissionAction
+			}
+		}{
+			{
+				Name:        entity.RoleAdmin,
+				Description: "Full system access",
+				Permissions: []struct {
+					Resource entity.ResourceType
+					Action   entity.PermissionAction
+				}{
+					{entity.ResourceTypeTask, entity.PermissionActionAll},
+					{entity.ResourceTypeUser, entity.PermissionActionAll},
+					{entity.ResourceTypeRole, entity.PermissionActionAll},
+					{entity.ResourceTypePermissions, entity.PermissionActionAll},
+					{entity.ResourceTypeLabels, entity.PermissionActionAll},
+				},
+			},
+			{
+				Name:        entity.RoleManager,
+				Description: "Management access",
+				Permissions: []struct {
+					Resource entity.ResourceType
+					Action   entity.PermissionAction
+				}{
+					{entity.ResourceTypeTask, entity.PermissionActionCreate},
+					{entity.ResourceTypeTask, entity.PermissionActionRead},
+					{entity.ResourceTypeTask, entity.PermissionActionUpdate},
+					{entity.ResourceTypeTask, entity.PermissionActionDelete},
+					{entity.ResourceTypeTask, entity.PermissionActionAssign},
+					{entity.ResourceTypeUser, entity.PermissionActionRead},
+					{entity.ResourceTypeLabel, entity.PermissionActionAll},
+				},
+			},
+			{
+				Name:        entity.RoleMember,
+				Description: "Member access",
+				Permissions: []struct {
+					Resource entity.ResourceType
+					Action   entity.PermissionAction
+				}{
+					{entity.ResourceTypeTask, entity.PermissionActionCreate},
+					{entity.ResourceTypeTask, entity.PermissionActionRead},
+					{entity.ResourceTypeTask, entity.PermissionActionUpdate},
+					{entity.ResourceTypeLabel, entity.PermissionActionRead},
+				},
+			},
+			{
+				Name:        entity.RoleViewer,
+				Description: "Viewer access",
+				Permissions: []struct {
+					Resource entity.ResourceType
+					Action   entity.PermissionAction
+				}{
+					{entity.ResourceTypeTask, entity.PermissionActionRead},
+					{entity.ResourceTypeUser, entity.PermissionActionRead},
+					{entity.ResourceTypeLabel, entity.PermissionActionRead},
+				},
+			},
 		}
-	}{
-		{
-			Name:        entity.RoleAdmin,
-			Description: "Full system access",
-			Permissions: []struct {
-				Resource entity.ResourceType
-				Action   entity.PermissionAction
-			}{
-				{entity.ResourceTypeTask, entity.PermissionActionAll},
-				{entity.ResourceTypeUser, entity.PermissionActionAll},
-				{entity.ResourceTypeRole, entity.PermissionActionAll},
-				{entity.ResourceTypePermissions, entity.PermissionActionAll},
-				{entity.ResourceTypeLabels, entity.PermissionActionAll},
-			},
-		},
-		{
-			Name:        entity.RoleManager,
-			Description: "Management access",
-			Permissions: []struct {
-				Resource entity.ResourceType
-				Action   entity.PermissionAction
-			}{
-				{entity.ResourceTypeTask, entity.PermissionActionCreate},
-				{entity.ResourceTypeTask, entity.PermissionActionRead},
-				{entity.ResourceTypeTask, entity.PermissionActionUpdate},
-				{entity.ResourceTypeTask, entity.PermissionActionDelete},
-				{entity.ResourceTypeTask, entity.PermissionActionAssign},
-				{entity.ResourceTypeUser, entity.PermissionActionRead},
-				{entity.ResourceTypeLabel, entity.PermissionActionAll},
-			},
-		},
-		{
-			Name:        entity.RoleMember,
-			Description: "Member access",
-			Permissions: []struct {
-				Resource entity.ResourceType
-				Action   entity.PermissionAction
-			}{
-				{entity.ResourceTypeTask, entity.PermissionActionCreate},
-				{entity.ResourceTypeTask, entity.PermissionActionRead},
-				{entity.ResourceTypeTask, entity.PermissionActionUpdate},
-				{entity.ResourceTypeLabel, entity.PermissionActionRead},
-			},
-		},
-		{
-			Name:        entity.RoleViewer,
-			Description: "Viewer access",
-			Permissions: []struct {
-				Resource entity.ResourceType
-				Action   entity.PermissionAction
-			}{
-				{entity.ResourceTypeTask, entity.PermissionActionRead},
-				{entity.ResourceTypeUser, entity.PermissionActionRead},
-				{entity.ResourceTypeLabel, entity.PermissionActionRead},
-			},
-		},
-	}
 
-	// 2. Map desired roles for easy lookup
-	desiredRolesMap := make(map[string]bool)
-	for _, r := range desiredRoles {
-		desiredRolesMap[r.Name] = true
-	}
-
-	// 3. Get existing roles from database
-	existingRoles, err := uc.roleRepo.FindAll(ctx)
-	if err != nil {
-		return err
-	}
-
-	// 4. Delete roles that are no longer defined in code
-	obsoleteRoles := make([]string, 0)
-	for _, er := range existingRoles {
-		if !desiredRolesMap[er.Name] {
-			obsoleteRoles = append(obsoleteRoles, er.Name)
+		// 2. Map desired roles for easy lookup
+		desiredRolesMap := make(map[string]bool)
+		for _, r := range desiredRoles {
+			desiredRolesMap[r.Name] = true
 		}
-	}
 
-	if len(obsoleteRoles) > 0 {
-		uc.logger.Info("deleting obsolete system roles", "roles", obsoleteRoles)
-		if err := uc.roleRepo.DeleteByNames(ctx, obsoleteRoles); err != nil {
-			return err
-		}
-	}
-
-	// 5. Upsert desired roles and sync permissions
-	for _, r := range desiredRoles {
-		// Check if role exists to get its ID or create new one
-		role, err := uc.roleRepo.FindByName(ctx, r.Name)
+		// 3. Get existing roles from database
+		existingRoles, err := roleRepo.FindAll(ctx)
 		if err != nil {
 			return err
 		}
 
-		if role == nil {
-			// Create new role entity
-			role, err = entity.NewRole(r.Name, r.Description)
+		// 4. Delete roles that are no longer defined in code
+		obsoleteRoles := make([]string, 0)
+		for _, er := range existingRoles {
+			if !desiredRolesMap[er.Name] {
+				obsoleteRoles = append(obsoleteRoles, er.Name)
+			}
+		}
+
+		if len(obsoleteRoles) > 0 {
+			uc.logger.Info("deleting obsolete system roles", "roles", obsoleteRoles)
+			if err := roleRepo.DeleteByNames(ctx, obsoleteRoles); err != nil {
+				return err
+			}
+		}
+
+		// 5. Upsert desired roles and sync permissions
+		for _, r := range desiredRoles {
+			// Check if role exists to get its ID or create new one
+			role, err := roleRepo.FindByName(ctx, r.Name)
 			if err != nil {
 				return err
 			}
-		} else {
-			// Update existing role metadata
-			role.UpdateDescription(r.Description)
-			role.UpdatedAt = time.Now().UTC()
-		}
 
-		// Clear permissions in the entity for sync
-		role.Permissions = make([]entity.Permission, 0)
+			if role == nil {
+				// Create new role entity
+				role, err = entity.NewRole(r.Name, r.Description)
+				if err != nil {
+					return err
+				}
+			} else {
+				// Update existing role metadata
+				role.UpdateDescription(r.Description)
+				role.UpdatedAt = time.Now().UTC()
+			}
 
-		// Create and add permissions to the entity
-		for _, rp := range r.Permissions {
-			pName := string(rp.Resource) + ":" + string(rp.Action)
-			perm, err := entity.NewPermission(pName, rp.Resource, rp.Action)
-			if err != nil {
+			// Clear permissions in the entity for sync
+			role.Permissions = make([]entity.Permission, 0)
+
+			// Create and add permissions to the entity
+			for _, rp := range r.Permissions {
+				pName := string(rp.Resource) + ":" + string(rp.Action)
+				perm, err := entity.NewPermission(pName, rp.Resource, rp.Action)
+				if err != nil {
+					return err
+				}
+				role.AddPermission(*perm)
+			}
+
+			// Clear existing permissions in DB for this role before saving new ones
+			// This ensures that removed permissions are also synced
+			if err := roleRepo.RemoveAllPermissions(ctx, role.ID); err != nil {
 				return err
 			}
-			role.AddPermission(*perm)
+
+			// Save/Upsert role and its permissions
+			if err := roleRepo.Save(ctx, role); err != nil {
+				return err
+			}
+
+			uc.logger.Info("synchronized system role", "role", r.Name)
 		}
 
-		// Clear existing permissions in DB for this role before saving new ones
-		// This ensures that removed permissions are also synced
-		if err := uc.roleRepo.RemoveAllPermissions(ctx, role.ID); err != nil {
-			return err
-		}
-
-		// Save/Upsert role and its permissions
-		if err := uc.roleRepo.Save(ctx, role); err != nil {
-			return err
-		}
-
-		uc.logger.Info("synchronized system role", "role", r.Name)
-	}
-
-	return nil
+		return nil
+	})
 }

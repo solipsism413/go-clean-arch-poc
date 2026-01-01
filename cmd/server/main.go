@@ -113,6 +113,9 @@ func main() {
 	// Initialize JWT token service
 	tokenService := jwt.NewTokenService(cfg.JWT)
 
+	// Initialize transaction manager
+	tm := postgres.NewTransactionManager(db.Pool)
+
 	// Initialize repositories
 	taskRepo := repository.NewTaskRepository(db.Pool)
 	userRepo := repository.NewUserRepository(db.Pool)
@@ -128,9 +131,9 @@ func main() {
 	v := validation.NewValidator()
 
 	// Initialize use cases
-	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, v, log)
-	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, v, log)
-	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tokenService, v, log)
+	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, tm, v, log)
+	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, v, log)
+	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, tokenService, v, log)
 
 	// Initialize auth middleware
 	authMiddleware := auth.NewMiddleware(authService, userService, authorizer, aclChecker)

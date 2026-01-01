@@ -10,11 +10,11 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/valueobject"
+	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/sqlc"
 )
 
 // Allowed columns for task sorting
@@ -29,13 +29,13 @@ var TaskAllowedSortColumns = []string{
 
 // TaskQueryBuilder provides methods for building task queries.
 type TaskQueryBuilder struct {
-	pool *pgxpool.Pool
+	db sqlc.DBTX
 }
 
 // NewTaskQueryBuilder creates a new task query builder.
-func NewTaskQueryBuilder(pool *pgxpool.Pool) *TaskQueryBuilder {
+func NewTaskQueryBuilder(db sqlc.DBTX) *TaskQueryBuilder {
 	return &TaskQueryBuilder{
-		pool: pool,
+		db: db,
 	}
 }
 
@@ -85,7 +85,7 @@ func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.Task
 	}
 
 	var total int64
-	err = tqb.pool.QueryRow(ctx, countSQL, countArgs...).Scan(&total)
+	err = tqb.db.QueryRow(ctx, countSQL, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -161,7 +161,7 @@ func (tqb *TaskQueryBuilder) FindWithFilter(ctx context.Context, filter dto.Task
 		return nil, 0, err
 	}
 
-	rows, err := tqb.pool.Query(ctx, selectSQL, selectArgs...)
+	rows, err := tqb.db.Query(ctx, selectSQL, selectArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -191,7 +191,7 @@ func (tqb *TaskQueryBuilder) Search(ctx context.Context, query string, paginatio
 	}
 
 	var total int64
-	err = tqb.pool.QueryRow(ctx, countSQL, countArgs...).Scan(&total)
+	err = tqb.db.QueryRow(ctx, countSQL, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -254,7 +254,7 @@ func (tqb *TaskQueryBuilder) Search(ctx context.Context, query string, paginatio
 		return nil, 0, err
 	}
 
-	rows, err := tqb.pool.Query(ctx, selectSQL, selectArgs...)
+	rows, err := tqb.db.Query(ctx, selectSQL, selectArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -285,7 +285,7 @@ func (tqb *TaskQueryBuilder) FindOverdue(ctx context.Context, pagination dto.Pag
 	}
 
 	var total int64
-	err = tqb.pool.QueryRow(ctx, countSQL, countArgs...).Scan(&total)
+	err = tqb.db.QueryRow(ctx, countSQL, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -325,7 +325,7 @@ func (tqb *TaskQueryBuilder) FindOverdue(ctx context.Context, pagination dto.Pag
 		return nil, 0, err
 	}
 
-	rows, err := tqb.pool.Query(ctx, selectSQL, selectArgs...)
+	rows, err := tqb.db.Query(ctx, selectSQL, selectArgs...)
 	if err != nil {
 		return nil, 0, err
 	}

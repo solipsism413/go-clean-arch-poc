@@ -24,6 +24,7 @@ type AuthUseCase struct {
 	roleRepo       output.RoleRepository
 	cache          output.CacheRepository
 	eventPublisher output.EventPublisher
+	tm             output.TransactionManager
 	tokenService   *jwt.TokenService
 	validator      validation.Validator
 	logger         *slog.Logger
@@ -35,6 +36,7 @@ func NewAuthUseCase(
 	roleRepo output.RoleRepository,
 	cache output.CacheRepository,
 	eventPublisher output.EventPublisher,
+	tm output.TransactionManager,
 	tokenService *jwt.TokenService,
 	validator validation.Validator,
 	logger *slog.Logger,
@@ -44,6 +46,7 @@ func NewAuthUseCase(
 		roleRepo:       roleRepo,
 		cache:          cache,
 		eventPublisher: eventPublisher,
+		tm:             tm,
 		tokenService:   tokenService,
 		validator:      validator,
 		logger:         logger,

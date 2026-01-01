@@ -9,7 +9,6 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/sqlc"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure UserRepository implements the output.UserRepository interface.
@@ -17,15 +16,15 @@ var _ output.UserRepository = (*UserRepository)(nil)
 
 // UserRepository implements the user repository using PostgreSQL.
 type UserRepository struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
 // NewUserRepository creates a new UserRepository.
-func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
+func NewUserRepository(db sqlc.DBTX) *UserRepository {
 	return &UserRepository{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 

@@ -33,7 +33,7 @@ func TestTaskUseCase_CreateTask_Validation(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// We don't need real repos for this validation check
-	uc := task.NewTaskUseCase(nil, nil, nil, nil, nil, mockValidator, logger)
+	uc := task.NewTaskUseCase(nil, nil, nil, nil, nil, nil, mockValidator, logger)
 
 	input := dto.CreateTaskInput{
 		Title: "Test Task",

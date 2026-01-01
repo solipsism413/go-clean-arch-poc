@@ -9,7 +9,6 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/sqlc"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure LabelRepository implements the output.LabelRepository interface.
@@ -17,15 +16,15 @@ var _ output.LabelRepository = (*LabelRepository)(nil)
 
 // LabelRepository implements the label repository using PostgreSQL.
 type LabelRepository struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
 // NewLabelRepository creates a new LabelRepository.
-func NewLabelRepository(pool *pgxpool.Pool) *LabelRepository {
+func NewLabelRepository(db sqlc.DBTX) *LabelRepository {
 	return &LabelRepository{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 
@@ -127,15 +126,15 @@ var _ output.ACLRepository = (*ACLRepository)(nil)
 
 // ACLRepository implements the ACL repository using PostgreSQL.
 type ACLRepository struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
 // NewACLRepository creates a new ACLRepository.
-func NewACLRepository(pool *pgxpool.Pool) *ACLRepository {
+func NewACLRepository(db sqlc.DBTX) *ACLRepository {
 	return &ACLRepository{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 

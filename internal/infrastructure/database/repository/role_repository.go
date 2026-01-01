@@ -9,7 +9,6 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/sqlc"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure RoleRepository implements the output.RoleRepository interface.
@@ -17,15 +16,15 @@ var _ output.RoleRepository = (*RoleRepository)(nil)
 
 // RoleRepository implements the role repository using PostgreSQL.
 type RoleRepository struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
 // NewRoleRepository creates a new RoleRepository.
-func NewRoleRepository(pool *pgxpool.Pool) *RoleRepository {
+func NewRoleRepository(db sqlc.DBTX) *RoleRepository {
 	return &RoleRepository{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 
@@ -36,15 +35,9 @@ func (r *RoleRepository) Save(ctx context.Context, role *entity.Role) error {
 		desc = &role.Description
 	}
 
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
+	qtx := r.queries
 
-	qtx := r.queries.WithTx(tx)
-
-	_, err = qtx.UpsertRole(ctx, sqlc.UpsertRoleParams{
+	_, err := qtx.UpsertRole(ctx, sqlc.UpsertRoleParams{
 		ID:          role.ID,
 		Name:        role.Name,
 		Description: desc,
@@ -76,7 +69,7 @@ func (r *RoleRepository) Save(ctx context.Context, role *entity.Role) error {
 		}
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 // Update updates an existing role.
@@ -242,15 +235,15 @@ var _ output.PermissionRepository = (*PermissionRepository)(nil)
 
 // PermissionRepository implements the permission repository using PostgreSQL.
 type PermissionRepository struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
 // NewPermissionRepository creates a new PermissionRepository.
-func NewPermissionRepository(pool *pgxpool.Pool) *PermissionRepository {
+func NewPermissionRepository(db sqlc.DBTX) *PermissionRepository {
 	return &PermissionRepository{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 

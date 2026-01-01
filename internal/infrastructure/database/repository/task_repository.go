@@ -14,7 +14,6 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/sqlc"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure TaskRepository implements the output.TaskRepository interface.
@@ -22,17 +21,17 @@ var _ output.TaskRepository = (*TaskRepository)(nil)
 
 // TaskRepository implements the task repository using PostgreSQL.
 type TaskRepository struct {
-	pool             *pgxpool.Pool
+	db               sqlc.DBTX
 	queries          *sqlc.Queries
 	taskQueryBuilder *querybuilder.TaskQueryBuilder
 }
 
 // NewTaskRepository creates a new TaskRepository.
-func NewTaskRepository(pool *pgxpool.Pool) *TaskRepository {
+func NewTaskRepository(db sqlc.DBTX) *TaskRepository {
 	return &TaskRepository{
-		pool:             pool,
-		queries:          sqlc.New(pool),
-		taskQueryBuilder: querybuilder.NewTaskQueryBuilder(pool),
+		db:               db,
+		queries:          sqlc.New(db),
+		taskQueryBuilder: querybuilder.NewTaskQueryBuilder(db),
 	}
 }
 
