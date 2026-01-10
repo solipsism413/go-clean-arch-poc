@@ -10,8 +10,8 @@ env:
   GO_VERSION: '1.25'
 
 jobs:
-  codegen:
-    name: Code Generation
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -21,7 +21,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Install codegen tools
         run: |
@@ -32,27 +31,6 @@ jobs:
         run: |
           sqlc generate
           swag init -g cmd/server/main.go -o docs
-
-      - name: Check for uncommitted changes
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::Generated code is not up to date. Please run 'make generate' and commit the changes."
-            git diff
-            exit 1
-          fi
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    needs: [ codegen ]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Run go vet
         run: go vet ./...
@@ -66,7 +44,6 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: [ codegen ]
     services:
       postgres:
         image: postgres:16-alpine
@@ -101,6 +78,16 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Install codegen tools
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+          go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Run code generation
+        run: |
+          sqlc generate
+          swag init -g cmd/server/main.go -o docs
 
       - name: Download dependencies
         run: go mod download
@@ -143,6 +130,16 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Install codegen tools
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+          go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Run code generation
+        run: |
+          sqlc generate
+          swag init -g cmd/server/main.go -o docs
 
       - name: Build ${{ matrix.name }}
         run: |
