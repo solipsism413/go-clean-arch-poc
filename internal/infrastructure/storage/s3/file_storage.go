@@ -29,17 +29,6 @@ type FileStorage struct {
 
 // NewFileStorage creates a new S3 file storage.
 func NewFileStorage(ctx context.Context, cfg appconfig.S3Config, logger *slog.Logger) (*FileStorage, error) {
-	// Create custom resolver for MinIO endpoint
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...any) (aws.Endpoint, error) {
-		if cfg.Endpoint != "" {
-			return aws.Endpoint{
-				URL:               cfg.Endpoint,
-				HostnameImmutable: true,
-			}, nil
-		}
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-	})
-
 	awsCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(cfg.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -47,7 +36,6 @@ func NewFileStorage(ctx context.Context, cfg appconfig.S3Config, logger *slog.Lo
 			cfg.SecretAccessKey,
 			"",
 		)),
-		config.WithEndpointResolverWithOptions(customResolver),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
@@ -55,6 +43,9 @@ func NewFileStorage(ctx context.Context, cfg appconfig.S3Config, logger *slog.Lo
 
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = cfg.UsePathStyle
+		if cfg.Endpoint != "" {
+			o.BaseEndpoint = aws.String(cfg.Endpoint)
+		}
 	})
 
 	presigner := s3.NewPresignClient(client)

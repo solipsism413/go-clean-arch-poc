@@ -25,8 +25,7 @@ func TestAuthHandler_Login(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		var result map[string]any
-		result = ParseResponse[map[string]any](t, resp)
+		result := ParseResponse[map[string]any](t, resp)
 
 		assert.True(t, result["success"].(bool))
 		data := result["data"].(map[string]any)

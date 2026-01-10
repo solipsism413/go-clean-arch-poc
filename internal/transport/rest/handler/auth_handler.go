@@ -14,7 +14,6 @@ import (
 // AuthHandler handles authentication-related HTTP requests.
 type AuthHandler struct {
 	authService input.AuthService
-	userService input.UserService
 	logger      *slog.Logger
 }
 
