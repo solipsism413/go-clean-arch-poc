@@ -125,13 +125,13 @@ type CreateACLEntryInput struct {
 
 // ACLEntryOutput represents the output for ACL operations.
 type ACLEntryOutput struct {
-	ID           uuid.UUID `json:"id"`
-	ResourceType entity.ResourceType `json:"resourceType"`
-	ResourceID   uuid.UUID `json:"resourceId"`
+	ID           uuid.UUID             `json:"id"`
+	ResourceType entity.ResourceType   `json:"resourceType"`
+	ResourceID   uuid.UUID             `json:"resourceId"`
 	SubjectType  entity.ACLSubjectType `json:"subjectType"`
-	SubjectID    uuid.UUID `json:"subjectId"`
-	Permission   entity.ACLPermission `json:"permission"`
-	CreatedAt    time.Time `json:"createdAt"`
+	SubjectID    uuid.UUID             `json:"subjectId"`
+	Permission   entity.ACLPermission  `json:"permission"`
+	CreatedAt    time.Time             `json:"createdAt"`
 }
 
 // ACLEntryFromEntity converts an ACLEntry entity to ACLEntryOutput DTO.

@@ -405,10 +405,10 @@ func setupTestAuthUseCase(
 // createTestTokenService creates a real TokenService for testing.
 func createTestTokenService() *jwt.TokenService {
 	cfg := config.JWTConfig{
-		SecretKey:           "test-secret-key-for-testing-only",
-		AccessTokenDuration: 1 * time.Hour,
+		SecretKey:            "test-secret-key-for-testing-only",
+		AccessTokenDuration:  1 * time.Hour,
 		RefreshTokenDuration: 24 * time.Hour,
-		Issuer:              "test-issuer",
+		Issuer:               "test-issuer",
 	}
 	return jwt.NewTokenService(cfg)
 }
