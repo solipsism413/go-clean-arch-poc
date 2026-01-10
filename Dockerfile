@@ -1,10 +1,14 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates
+
+# Install code generation tools
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
+    go install github.com/swaggo/swag/cmd/swag@latest
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -12,6 +16,10 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Run code generation
+RUN sqlc generate && \
+    swag init -g cmd/server/main.go -o docs
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/server ./cmd/server
