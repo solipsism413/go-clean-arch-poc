@@ -1,6 +1,6 @@
 # Task Manager - Makefile
 
-.PHONY: all build run test clean docker-up docker-down migrate generate lint fmt help
+.PHONY: all build run test clean docker-up docker-down setup-infra migrate generate lint fmt help
 
 # Variables
 APP_NAME := task-manager
@@ -69,6 +69,21 @@ docker-up:
 docker-down:
 	@echo "Stopping Docker services..."
 	$(DOCKER_COMPOSE) down
+
+# Setup infrastructure services only (for local development)
+setup-infra:
+	@echo "Starting infrastructure services..."
+	$(DOCKER_COMPOSE) up -d postgres redis kafka minio minio-init
+	@echo "Waiting for services to be healthy..."
+	@sleep 5
+	@echo "Running migrations..."
+	$(DOCKER_COMPOSE) run --rm migrate
+	@echo "Infrastructure setup complete!"
+	@echo "Services running:"
+	@echo "  - PostgreSQL: localhost:5433"
+	@echo "  - Redis: localhost:6379"
+	@echo "  - Kafka: localhost:9092"
+	@echo "  - MinIO: localhost:9000 (Console: localhost:9001)"
 
 # Run database migrations
 migrate-up:
@@ -141,6 +156,7 @@ help:
 	@echo "  clean           - Clean build artifacts"
 	@echo "  docker-up       - Start Docker services"
 	@echo "  docker-down     - Stop Docker services"
+	@echo "  setup-infra     - Setup infrastructure services (postgres, redis, kafka, minio)"
 	@echo "  migrate-up      - Run database migrations"
 	@echo "  migrate-down    - Rollback last migration"
 	@echo "  generate-sqlc   - Generate SQLC code"
