@@ -38,7 +38,7 @@ jobs:
       - name: Run staticcheck
         uses: dominikh/staticcheck-action@v1
         with:
-          version: "2024.1.1"
+          version: "latest"
           install-go: false
 
   test:
