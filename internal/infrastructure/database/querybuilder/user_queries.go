@@ -149,7 +149,11 @@ func (uqb *UserQueryBuilder) Search(ctx context.Context, query string, paginatio
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 	countQuery := psql.Select("COUNT(*)").From("users")
 	if query != "" {
-		countQuery = countQuery.Where(sq.ILike{"name": "%" + query + "%"})
+		or := sq.Or{
+			sq.ILike{"name": "%" + query + "%"},
+			sq.ILike{"email": "%" + query + "%"},
+		}
+		countQuery = countQuery.Where(or)
 	}
 
 	countSQL, countArgs, err := countQuery.ToSql()
