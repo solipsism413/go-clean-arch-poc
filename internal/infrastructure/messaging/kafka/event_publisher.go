@@ -172,6 +172,10 @@ func (s *EventSubscriber) Subscribe(ctx context.Context, topic string, groupID s
 
 		for {
 			if err := s.consumerGroup.Consume(ctx, []string{topic}, handler); err != nil {
+				// Check if the consumer group was closed intentionally
+				if err == sarama.ErrClosedConsumerGroup {
+					return
+				}
 				s.logger.Error("consumer group error", "error", err)
 			}
 
