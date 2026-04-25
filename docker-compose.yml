@@ -2,29 +2,52 @@ x-app-base: &app-base
   build:
     context: .
     dockerfile: Dockerfile
+  env_file:
+    - .env
   ports:
-    - "8080:8080"
+    - "${APP_PORT:-8080}:8080"
   environment:
-    - SERVER_HOST=0.0.0.0
-    - SERVER_PORT=8080
+    - SERVER_HOST=${SERVER_HOST:-0.0.0.0}
+    - SERVER_PORT=${SERVER_PORT:-8080}
+    - SERVER_READ_TIMEOUT=${SERVER_READ_TIMEOUT:-30s}
+    - SERVER_WRITE_TIMEOUT=${SERVER_WRITE_TIMEOUT:-30s}
+    - SERVER_IDLE_TIMEOUT=${SERVER_IDLE_TIMEOUT:-120s}
+    - GRPC_PORT=${GRPC_PORT:-9090}
     - DB_HOST=postgres
     - DB_PORT=5432
-    - DB_USER=taskmanager
-    - DB_PASSWORD=taskmanager_secret
-    - DB_NAME=taskmanager
-    - DB_SSLMODE=disable
+    - DB_USER=${DB_USER:-taskmanager}
+    - DB_PASSWORD=${DB_PASSWORD:-taskmanager_secret}
+    - DB_NAME=${DB_NAME:-taskmanager}
+    - DB_SSLMODE=${DB_SSLMODE:-disable}
+    - DB_MAX_CONNS=${DB_MAX_CONNS:-25}
+    - DB_MIN_CONNS=${DB_MIN_CONNS:-5}
+    - DB_MAX_CONN_LIFETIME=${DB_MAX_CONN_LIFETIME:-1h}
+    - DB_MAX_CONN_IDLE_TIME=${DB_MAX_CONN_IDLE_TIME:-30m}
     - REDIS_HOST=redis
     - REDIS_PORT=6379
-    - REDIS_PASSWORD=redis_secret
+    - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_secret}
+    - REDIS_DB=${REDIS_DB:-0}
+    - REDIS_POOL_SIZE=${REDIS_POOL_SIZE:-10}
+    - REDIS_MIN_IDLE_CONNS=${REDIS_MIN_IDLE_CONNS:-5}
     - KAFKA_BROKERS=kafka:9092
+    - KAFKA_CONSUMER_GROUP=${KAFKA_CONSUMER_GROUP:-taskmanager}
+    - KAFKA_AUTO_OFFSET_RESET=${KAFKA_AUTO_OFFSET_RESET:-earliest}
     - S3_ENDPOINT=http://minio:9000
-    - S3_REGION=us-east-1
-    - S3_ACCESS_KEY_ID=minioadmin
-    - S3_SECRET_ACCESS_KEY=minioadmin123
-    - S3_BUCKET=taskmanager
-    - S3_USE_PATH_STYLE=true
-    - JWT_SECRET=your-super-secret-jwt-key-change-in-production
-    - OTEL_ENABLED=false
+    - S3_REGION=${S3_REGION:-us-east-1}
+    - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-minioadmin}
+    - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-minioadmin123}
+    - S3_BUCKET=${S3_BUCKET:-taskmanager}
+    - S3_USE_PATH_STYLE=${S3_USE_PATH_STYLE:-true}
+    - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+    - JWT_ACCESS_TOKEN_TTL=${JWT_ACCESS_TOKEN_TTL:-15m}
+    - JWT_REFRESH_TOKEN_TTL=${JWT_REFRESH_TOKEN_TTL:-168h}
+    - JWT_ISSUER=${JWT_ISSUER:-taskmanager}
+    - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-taskmanager}
+    - OTEL_SERVICE_VERSION=${OTEL_SERVICE_VERSION:-1.0.0}
+    - OTEL_EXPORTER_ENDPOINT=${OTEL_EXPORTER_ENDPOINT:-localhost:4317}
+    - OTEL_ENABLED=${OTEL_ENABLED:-false}
+    - LOG_LEVEL=${LOG_LEVEL:-info}
+    - LOG_FORMAT=${LOG_FORMAT:-json}
   depends_on:
     postgres:
       condition: service_healthy
@@ -91,16 +114,18 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
+    env_file:
+      - .env
     ports:
-      - "5433:5432"
+      - "${POSTGRES_EXTERNAL_PORT:-5433}:5432"
     environment:
-      - POSTGRES_USER=taskmanager
-      - POSTGRES_PASSWORD=taskmanager_secret
-      - POSTGRES_DB=taskmanager
+      - POSTGRES_USER=${DB_USER:-taskmanager}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-taskmanager_secret}
+      - POSTGRES_DB=${DB_NAME:-taskmanager}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taskmanager -d taskmanager"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-taskmanager} -d ${DB_NAME:-taskmanager}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -112,13 +137,15 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
+    env_file:
+      - .env
     ports:
-      - "6379:6379"
-    command: redis-server --requirepass redis_secret --appendonly yes
+      - "${REDIS_EXTERNAL_PORT:-6379}:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secret} --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_secret", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -149,8 +176,8 @@ services:
       - --set
       - redpanda.enable_idempotence=true
     ports:
-      - "9092:9092"
-      - "9644:9644"
+      - "${KAFKA_EXTERNAL_PORT:-9092}:9092"
+      - "${KAFKA_ADMIN_EXTERNAL_PORT:-9644}:9644"
     volumes:
       - kafka_data:/var/lib/redpanda/data
     healthcheck:
@@ -166,12 +193,14 @@ services:
   # MinIO (S3-compatible object storage)
   minio:
     image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    env_file:
+      - .env
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_EXTERNAL_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_EXTERNAL_PORT:-9001}:9001"
     environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin123
+      - MINIO_ROOT_USER=${S3_ACCESS_KEY_ID:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${S3_SECRET_ACCESS_KEY:-minioadmin123}
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
@@ -188,14 +217,16 @@ services:
   # MinIO bucket initialization
   minio-init:
     image: minio/mc:RELEASE.2024-01-16T16-06-34Z
+    env_file:
+      - .env
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set myminio http://minio:9000 minioadmin minioadmin123;
-      mc mb myminio/taskmanager --ignore-existing;
-      mc anonymous set download myminio/taskmanager;
+      mc alias set myminio http://minio:9000 ${S3_ACCESS_KEY_ID:-minioadmin} ${S3_SECRET_ACCESS_KEY:-minioadmin123};
+      mc mb myminio/${S3_BUCKET:-taskmanager} --ignore-existing;
+      mc anonymous set download myminio/${S3_BUCKET:-taskmanager};
       exit 0;
       "
     networks:
@@ -204,12 +235,14 @@ services:
   # Database migrations
   migrate:
     image: migrate/migrate:v4.17.0
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./migrations:/migrations
-    command: ["-path", "/migrations", "-database", "postgres://taskmanager:taskmanager_secret@postgres:5432/taskmanager?sslmode=disable", "up"]
+    command: ["-path", "/migrations", "-database", "postgres://${DB_USER:-taskmanager}:${DB_PASSWORD:-taskmanager_secret}@postgres:5432/${DB_NAME:-taskmanager}?sslmode=${DB_SSLMODE:-disable}", "up"]
     networks:
       - taskmanager-network
 
