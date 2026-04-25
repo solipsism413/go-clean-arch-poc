@@ -2,13 +2,52 @@
 
 A task management application built with Hexagonal (Ports & Adapters) Architecture in Go.
 
-## Current Status
+## Progress
 
-- Active HTTP interfaces: REST API, WebSocket, SSE, and Socket.IO.
-- Swagger documents the REST API at `/swagger/`.
-- GraphQL currently exists as schema only in `internal/transport/graphql/schema.graphqls` and is not exposed by the server.
-- gRPC currently starts a server shell, but no application services are registered yet.
-- `POST /api/v1/auth/register` is routed, but currently returns `501 Not Implemented`.
+### Completed
+
+- [x] Hexagonal architecture structure is in place across `domain`, `application`, `transport`, and `infrastructure` layers.
+- [x] Core domain model is available for users, tasks, roles, labels, permissions, and ACL entries.
+- [x] Main use cases are implemented for task management, user management, and authentication.
+- [x] REST API routes are wired for auth, tasks, and users.
+- [x] JWT-based authentication and authorization middleware are connected to the REST layer.
+- [x] RBAC and ACL checks are already integrated into protected endpoints.
+- [x] Realtime transports are available through WebSocket, SSE, and Socket.IO endpoints.
+- [x] PostgreSQL, Redis, Kafka, and S3/MinIO bootstrap code is already integrated into server startup.
+- [x] SQLC queries and initial database migration are present.
+- [x] Swagger documentation is generated for the REST API.
+- [x] Automated tests already cover domain entities, use cases, repositories, query builders, cache, messaging, tracing, and REST handlers.
+
+### Known Gaps
+
+- [ ] `POST /api/v1/auth/register` still returns `501 Not Implemented`.
+- [ ] GraphQL schema is present, but the GraphQL transport is not exposed by the running server yet.
+- [ ] gRPC server infrastructure exists, but application services are not registered yet.
+- [ ] Label management endpoints and dedicated label use cases are not exposed yet even though label entities and repositories already exist.
+- [ ] File storage integration is initialized at startup, but no user-facing upload/download flow is implemented yet.
+
+## Roadmap
+
+### Near Term
+
+- [ ] Implement user self-registration in `AuthHandler` and connect it to the user/auth use case flow.
+- [ ] Complete REST coverage for label management: create, list, update, delete, and task-label workflows.
+- [ ] Add integration tests for the main auth and task flows against real infrastructure dependencies.
+- [ ] Improve API consistency for validation errors, auth failures, and pagination responses.
+
+### Mid Term
+
+- [ ] Expose GraphQL over HTTP using the existing schema as the starting contract.
+- [ ] Register real gRPC services for task, user, and auth operations.
+- [ ] Add Kafka consumers or background workers so published domain events trigger useful downstream behavior.
+- [ ] Expand Redis usage beyond cache invalidation into token/session revocation or read-model caching.
+
+### Later
+
+- [ ] Implement file attachment flows backed by S3/MinIO for task-related assets.
+- [ ] Add richer observability with tracing dashboards, metrics, and health/readiness checks for dependencies.
+- [ ] Add delivery support for production deployment, CI pipeline, and release automation.
+- [ ] Revisit multi-transport parity so REST, GraphQL, gRPC, and realtime channels expose a consistent capability set.
 
 ## Architecture
 
