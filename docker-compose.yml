@@ -1,46 +1,92 @@
-version: '3.8'
+x-app-base: &app-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  ports:
+    - "8080:8080"
+  environment:
+    - SERVER_HOST=0.0.0.0
+    - SERVER_PORT=8080
+    - DB_HOST=postgres
+    - DB_PORT=5432
+    - DB_USER=taskmanager
+    - DB_PASSWORD=taskmanager_secret
+    - DB_NAME=taskmanager
+    - DB_SSLMODE=disable
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=redis_secret
+    - KAFKA_BROKERS=kafka:9092
+    - S3_ENDPOINT=http://minio:9000
+    - S3_REGION=us-east-1
+    - S3_ACCESS_KEY_ID=minioadmin
+    - S3_SECRET_ACCESS_KEY=minioadmin123
+    - S3_BUCKET=taskmanager
+    - S3_USE_PATH_STYLE=true
+    - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+    - OTEL_ENABLED=false
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    kafka:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+  networks:
+    - taskmanager-network
+  restart: unless-stopped
 
 services:
-  # Application
+  # Production application
   app:
+    <<: *app-base
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8080
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=taskmanager
-      - DB_PASSWORD=taskmanager_secret
-      - DB_NAME=taskmanager
-      - DB_SSLMODE=disable
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=redis_secret
-      - KAFKA_BROKERS=kafka:9092
-      - S3_ENDPOINT=http://minio:9000
-      - S3_REGION=us-east-1
-      - S3_ACCESS_KEY_ID=minioadmin
-      - S3_SECRET_ACCESS_KEY=minioadmin123
-      - S3_BUCKET=taskmanager
-      - S3_USE_PATH_STYLE=true
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
-      - OTEL_ENABLED=false
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    networks:
-      - taskmanager-network
-    restart: unless-stopped
+      target: production
+    command: ["./server"]
+    profiles: ["prod"]
+
+  # Development application with Compose watch
+  app-watch:
+    <<: *app-base
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    command: ["air", "-c", ".air.toml"]
+    profiles: ["watch"]
+    develop:
+      watch:
+        - action: sync
+          path: ./cmd
+          target: /app/cmd
+        - action: sync
+          path: ./internal
+          target: /app/internal
+        - action: sync
+          path: ./pkg
+          target: /app/pkg
+        - action: sync
+          path: ./docs
+          target: /app/docs
+        - action: sync
+          path: ./migrations
+          target: /app/migrations
+        - action: rebuild
+          path: ./go.mod
+        - action: rebuild
+          path: ./go.sum
+        - action: rebuild
+          path: ./.air.toml
+        - action: rebuild
+          path: ./Dockerfile
+        - action: rebuild
+          path: ./sqlc.yaml
+        - action: rebuild
+          path: ./gqlgen.yml
 
   # PostgreSQL Database
   postgres:
@@ -108,7 +154,7 @@ services:
     volumes:
       - kafka_data:/var/lib/redpanda/data
     healthcheck:
-      test: ["CMD-SHELL", "rpk cluster health | grep -q 'HEALTHY'"]
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:[[:space:]]*true'"]
       interval: 10s
       timeout: 5s
       retries: 5

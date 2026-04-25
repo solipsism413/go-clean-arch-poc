@@ -1,6 +1,6 @@
 # Task Manager - Makefile
 
-.PHONY: all build run test clean docker-up docker-down setup-infra migrate generate lint fmt help
+.PHONY: all build run test clean docker-up docker-watch docker-down setup-infra migrate generate lint fmt help
 
 # Variables
 APP_NAME := task-manager
@@ -9,7 +9,7 @@ GRPC_NAME := task-manager-grpc
 BUILD_DIR := ./bin
 API_MAIN := ./cmd/server
 GRPC_MAIN := ./cmd/grpc
-DOCKER_COMPOSE := docker-compose
+DOCKER_COMPOSE := docker compose
 
 # Build both services
 build: build-api build-grpc
@@ -63,7 +63,12 @@ clean:
 # Start Docker services
 docker-up:
 	@echo "Starting Docker services..."
-	$(DOCKER_COMPOSE) up -d
+	$(DOCKER_COMPOSE) --profile prod up -d
+
+# Start Docker services with Compose watch
+docker-watch:
+	@echo "Starting Docker services with Compose watch..."
+	$(DOCKER_COMPOSE) --profile watch up --watch
 
 # Stop Docker services
 docker-down:
@@ -155,6 +160,7 @@ help:
 	@echo "  test-coverage   - Run tests with coverage report"
 	@echo "  clean           - Clean build artifacts"
 	@echo "  docker-up       - Start Docker services"
+	@echo "  docker-watch    - Start Docker services with Compose watch"
 	@echo "  docker-down     - Stop Docker services"
 	@echo "  setup-infra     - Setup infrastructure services (postgres, redis, kafka, minio)"
 	@echo "  migrate-up      - Run database migrations"

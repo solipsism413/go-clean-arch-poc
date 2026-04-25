@@ -222,30 +222,42 @@ graph LR
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.26.2+
 - Docker & Docker Compose
 
 ### Running with Docker
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose --profile prod up -d
 
 # View logs
-docker-compose logs -f app
+docker compose logs -f app
 
 # Stop services
-docker-compose down
+docker compose down
 ```
+
+### Running with Docker Compose Watch
+
+```bash
+# Start services and watch application source changes
+docker compose --profile watch up --watch
+
+# Or via Makefile
+make docker-watch
+```
+
+`docker-compose.yml` is now the single source for both modes using Compose `profiles`. `app` runs under the `prod` profile with the production image/runtime, while `app-watch` runs under the `watch` profile with `air` and `develop.watch`. Changes under `cmd/`, `internal/`, `pkg/`, `docs/`, and `migrations/` are synced into the container, while changes to `go.mod`, `go.sum`, `.air.toml`, `Dockerfile`, `sqlc.yaml`, and `gqlgen.yml` trigger an image rebuild.
 
 ### Running Locally
 
 ```bash
 # Start infrastructure services
-docker-compose up -d postgres redis kafka minio
+docker compose up -d postgres redis kafka minio
 
 # Run migrations
-docker-compose run --rm migrate
+docker compose run --rm migrate
 
 # Run the application
 go run ./cmd/server

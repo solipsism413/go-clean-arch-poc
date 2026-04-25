@@ -1,0 +1,8 @@
+.git
+.github
+.claude
+.vscode
+bin
+tmp
+coverage.out
+coverage.html
