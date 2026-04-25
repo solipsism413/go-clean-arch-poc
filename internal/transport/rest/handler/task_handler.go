@@ -3,6 +3,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	domainerror "github.com/handiism/go-clean-arch-poc/internal/domain/error"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/valueobject"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 )
 
@@ -519,6 +521,13 @@ func handleError(w http.ResponseWriter, err error) {
 	}
 
 	if domainerror.IsValidationError(err) {
+		presenter.Error(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	if errors.Is(err, entity.ErrInvalidStatus) || errors.Is(err, entity.ErrInvalidStatusTransition) ||
+		errors.Is(err, entity.ErrTaskArchived) || errors.Is(err, entity.ErrTaskNotDone) ||
+		errors.Is(err, valueobject.ErrInvalidTaskStatus) {
 		presenter.Error(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}

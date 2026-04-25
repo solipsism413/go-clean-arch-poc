@@ -1,10 +1,12 @@
 package rest_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,22 +18,21 @@ func TestTaskHandler_Create(t *testing.T) {
 	user := app.CreateTestUser(t, "task-create@example.com", "password123")
 
 	t.Run("create task with valid data", func(t *testing.T) {
+		user.AccessToken = createAuthorizedToken(t, app, user.ID, user.Email, []string{entity.RoleAdmin}, []string{"tasks:*"})
+
 		resp := app.DoRequest(t, "POST", "/api/v1/tasks", map[string]any{
 			"title":       "Test Task",
 			"description": "Test Description",
 			"priority":    "HIGH",
 		}, user.AccessToken)
 
-		// May require permissions, check for 201 or 403
-		if resp.StatusCode == http.StatusCreated {
-			result := ParseResponse[map[string]any](t, resp)
-			assert.True(t, result["success"].(bool))
-			data := result["data"].(map[string]any)
-			assert.Equal(t, "Test Task", data["title"])
-		} else {
-			// Permission denied is acceptable without proper role
-			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		}
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		result := ParseResponse[map[string]any](t, resp)
+		assert.True(t, result["success"].(bool))
+		data := result["data"].(map[string]any)
+		assert.Equal(t, "Test Task", data["title"])
+		assert.Equal(t, user.ID.String(), data["creatorId"])
 	})
 
 	t.Run("unauthenticated", func(t *testing.T) {
@@ -42,6 +43,45 @@ func TestTaskHandler_Create(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
+}
+
+func TestTaskHandler_ChangeStatus(t *testing.T) {
+	app := SetupTestApp(t)
+	defer app.Cleanup(t)
+
+	user := app.CreateTestUser(t, "task-status@example.com", "password123")
+	user.AccessToken = createAuthorizedToken(t, app, user.ID, user.Email, []string{entity.RoleAdmin}, []string{"tasks:*"})
+
+	ctx := context.Background()
+	taskID := uuid.New()
+	_, err := app.Pool.Exec(ctx, `
+		INSERT INTO tasks (id, title, description, status, priority, creator_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+	`, taskID, "Archived Task", "Test Description", "ARCHIVED", "HIGH", user.ID)
+	require.NoError(t, err)
+
+	_, err = app.Pool.Exec(ctx, `
+		INSERT INTO acl_entries (resource_type, resource_id, subject_type, subject_id, permission, created_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+	`, "task", taskID, "user", user.ID, "admin")
+	require.NoError(t, err)
+
+	resp := app.DoRequest(t, "POST", "/api/v1/tasks/"+taskID.String()+"/status", map[string]any{
+		"status": "IN_REVIEW",
+	}, user.AccessToken)
+
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	result := ParseResponse[map[string]any](t, resp)
+	assert.False(t, result["success"].(bool))
+}
+
+func createAuthorizedToken(t *testing.T, app *TestApp, userID uuid.UUID, email string, roles []string, permissions []string) string {
+	t.Helper()
+
+	authOutput, err := app.TokenService.GenerateTokenPair(context.Background(), userID, email, roles, nil, permissions)
+	require.NoError(t, err)
+
+	return authOutput.AccessToken
 }
 
 func TestTaskHandler_List(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/output"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
+	"github.com/handiism/go-clean-arch-poc/internal/auth"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	domainerror "github.com/handiism/go-clean-arch-poc/internal/domain/error"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
@@ -613,10 +614,9 @@ func (uc *TaskUseCase) GetOverdueTasks(ctx context.Context, pagination dto.Pagin
 }
 
 // getCreatorIDFromContext extracts the user ID from context.
-// In a real implementation, this would be set by the auth middleware.
 func getCreatorIDFromContext(ctx context.Context) uuid.UUID {
-	if userID, ok := ctx.Value("userID").(uuid.UUID); ok {
-		return userID
+	if claims := auth.GetClaimsFromContext(ctx); claims != nil {
+		return claims.UserID
 	}
 	return uuid.Nil
 }
