@@ -14,6 +14,7 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/output"
 	authUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
 	labelUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/label"
+	roleUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/rbac"
 	taskUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
@@ -29,6 +30,7 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/kafka"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/observability/logger"
 	s3Storage "github.com/handiism/go-clean-arch-poc/internal/infrastructure/storage/s3"
+	"github.com/handiism/go-clean-arch-poc/internal/transport/graphql"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/socketio"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/sse"
@@ -150,6 +152,7 @@ func main() {
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, tokenService, v, log)
 	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
+	roleService := roleUseCase.NewRoleUseCase(roleRepo, log)
 
 	// Initialize background event consumer
 	eventConsumer := worker.NewEventConsumer(log)
@@ -222,6 +225,15 @@ func main() {
 	// =====================
 	router := rest.NewRouter(taskService, userService, authService, labelService, authMiddleware, aclChecker, log)
 
+	// =====================
+	// Initialize GraphQL
+	// =====================
+	graphQLResolver := graphql.NewResolver(taskService, userService, authService, labelService, roleService, authorizer)
+	graphQLHandler := graphql.NewHandler(graphQLResolver, authService)
+	router.Handle("POST /graphql", graphQLHandler)
+	router.Handle("GET /graphql", graphQLHandler)
+	router.Handle("GET /graphql/playground", graphql.NewPlaygroundHandler("/graphql"))
+
 	// Register WebSocket handler
 	router.Handle("GET /ws", websocket.NewHandler(wsHub, taskService, authService, log))
 
@@ -255,6 +267,8 @@ func main() {
 	// Print transport endpoints
 	log.Info("=== Transport Endpoints ===")
 	log.Info("REST API", "url", fmt.Sprintf("http://%s/api/v1", server.Addr))
+	log.Info("GraphQL", "url", fmt.Sprintf("http://%s/graphql", server.Addr))
+	log.Info("GraphQL Playground", "url", fmt.Sprintf("http://%s/graphql/playground", server.Addr))
 	log.Info("WebSocket", "url", fmt.Sprintf("ws://%s/ws", server.Addr))
 	log.Info("SSE", "url", fmt.Sprintf("http://%s/events", server.Addr))
 	log.Info("Socket.IO", "url", fmt.Sprintf("http://%s/socket.io/", server.Addr))

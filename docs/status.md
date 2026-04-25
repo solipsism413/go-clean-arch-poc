@@ -23,10 +23,10 @@ This file is the single operational view for implementation progress, current pr
 - [x] Register real gRPC services for task, user, auth, and label operations.
 - [x] Add CI, delivery automation, and release workflow support.
 - [x] Add background consumers or subscribers for published domain events.
+- [x] Expose GraphQL over HTTP using the existing schema.
 
 ## Next
 
-- [ ] Expose GraphQL over HTTP using the existing schema.
 - [ ] Expand Redis usage into token revocation, session invalidation, or read caching.
 
 ## Later
@@ -37,8 +37,8 @@ This file is the single operational view for implementation progress, current pr
 
 ## Notes
 
-- GraphQL currently exists as schema only.
-  Reference: `internal/transport/graphql/schema.graphqls`
+- GraphQL HTTP endpoint is now available at `/graphql` with a Playground at `/graphql/playground`.
+  Reference: `internal/transport/graphql/`, `cmd/server/main.go`
 - gRPC services are fully implemented and registered for task, user, auth, and label operations.
   Reference: `cmd/grpc/main.go`, `internal/transport/grpc/services.go`
 - File storage is initialized, but no user-facing attachment workflow exists yet.
@@ -46,6 +46,6 @@ This file is the single operational view for implementation progress, current pr
 
 ## Scope Summary
 
-- Working today: REST API, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
-- Partial today: GraphQL schema and file storage adapters without user-facing workflows.
-- Main gap today: GraphQL HTTP endpoint, expanded Redis usage, and attachment workflows beyond the core REST and gRPC surfaces.
+- Working today: REST API, GraphQL HTTP endpoint, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
+- Partial today: file storage adapters without user-facing workflows.
+- Main gap today: expanded Redis usage and attachment workflows beyond the core REST, GraphQL, and gRPC surfaces.

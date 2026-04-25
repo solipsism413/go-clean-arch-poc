@@ -18,6 +18,7 @@
 - Full test suite: `make test` (`go test -v -race ./...`).
 - Focused Go test: `go test ./internal/transport/rest -run TestName -count=1`.
 - Focused package test: `go test ./internal/infrastructure/database/repository -count=1`.
+- Quick-testing tip: skip the repository package (`internal/infrastructure/database/repository`) when you want fast feedback; it spins up Testcontainers and is slow. Run it only when you actually change repository code.
 
 ## Codegen And Generated Artifacts
 - Run codegen before verification if you change SQL queries, migrations, or Swagger annotations/comments.

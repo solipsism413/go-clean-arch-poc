@@ -119,6 +119,7 @@ generate-sqlc:
 # Generate GraphQL code
 generate-graphql:
 	@echo "Generating GraphQL code..."
+	go get github.com/99designs/gqlgen@v0.17.64
 	go run github.com/99designs/gqlgen generate
 
 # Generate gRPC code
