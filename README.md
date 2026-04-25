@@ -18,7 +18,8 @@ Task management application built in Go with a ports-and-adapters style architec
 - Label CRUD is available over REST with case-insensitive unique names.
 - Realtime transports available through WebSocket, SSE, and Socket.IO.
 - PostgreSQL, Redis, Kafka, and S3 or MinIO bootstrap are already wired.
-- GraphQL and gRPC exist as partial scaffolding and are not yet feature-complete.
+- GraphQL exists as schema-only and is not yet exposed over HTTP.
+- gRPC services for task, user, auth, and label operations are fully implemented and registered.
 
 ## Quick Start
 
@@ -41,7 +42,7 @@ make seed-db
 go run ./cmd/server
 ```
 
-Optional gRPC server shell:
+Optional gRPC server:
 
 ```bash
 go run ./cmd/grpc
@@ -76,7 +77,7 @@ Seeded development users are created with password `password123`.
 
 - Invalid pagination query params now return `400 Bad Request` instead of being silently coerced.
 - GraphQL schema exists in `internal/transport/graphql/schema.graphqls`, but no HTTP endpoint is active yet.
-- gRPC server bootstraps successfully on `cfg.GRPC.Port`, but application services are not registered yet.
+- gRPC server bootstraps successfully on `cfg.GRPC.Port` with fully registered task, user, auth, and label services.
 
 ## License
 

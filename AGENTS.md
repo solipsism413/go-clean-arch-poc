@@ -2,7 +2,7 @@
 
 ## Entry Points
 - `cmd/server/main.go` is the real composition root. It wires PostgreSQL, Redis, Kafka, S3/MinIO, JWT auth, RBAC/ACL, REST, WebSocket, SSE, and Socket.IO, then seeds system roles on startup.
-- `cmd/grpc/main.go` is only a server shell today. It does not register concrete services and still starts on a fixed `9090` instead of `cfg.GRPC.Port`.
+- `cmd/grpc/main.go` wires the same dependencies as the HTTP server and registers full gRPC services for task, user, auth, and label operations. It starts on `cfg.GRPC.Port`.
 - GraphQL is schema/config only: `internal/transport/graphql/schema.graphqls`, `gqlgen.yml`. Do not assume an HTTP GraphQL endpoint exists.
 
 ## Architecture Map
@@ -24,7 +24,7 @@
 - `make generate` runs `sqlc generate` plus Swagger generation only.
 - SQLC input is `internal/infrastructure/database/sqlc/queries/` plus `migrations/`; generated output lands in `internal/infrastructure/database/sqlc`.
 - Swagger must exist under `docs/api/swagger` because `internal/transport/rest/router.go` imports `github.com/handiism/go-clean-arch-poc/docs/api/swagger`. Prefer `make generate-swagger` or `make generate`.
-- `generate-graphql` and `generate-grpc` targets exist, but those transports are partial; do not treat generation as proof the runtime path is complete.
+- `generate-graphql` and `generate-grpc` targets exist. The gRPC runtime path is complete; GraphQL remains schema-only with no active HTTP endpoint.
 
 ## Verification Gotchas
 - CI effectively does `sqlc generate` + Swagger generation before `go vet`, `staticcheck`, tests, and builds. Mirror that order when touching generated inputs.

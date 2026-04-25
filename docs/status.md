@@ -20,11 +20,12 @@ This file is the single operational view for implementation progress, current pr
 - [x] Add integration tests for the main auth and task flows against real dependencies.
 - [x] Normalize API behavior for validation, authorization, and pagination responses.
 - [x] Align gRPC startup with `cfg.GRPC.Port` instead of a fixed port.
+- [x] Register real gRPC services for task, user, auth, and label operations.
+- [x] Add CI, delivery automation, and release workflow support.
 
 ## Next
 
 - [ ] Expose GraphQL over HTTP using the existing schema.
-- [ ] Register real gRPC services for task, user, and auth operations.
 - [ ] Add background consumers or subscribers for published domain events.
 - [ ] Expand Redis usage into token revocation, session invalidation, or read caching.
 
@@ -32,20 +33,19 @@ This file is the single operational view for implementation progress, current pr
 
 - [ ] Implement task attachment upload and download flows backed by S3 or MinIO.
 - [ ] Add stronger observability around health, readiness, metrics, and tracing.
-- [ ] Add CI, delivery automation, and release workflow support.
 - [ ] Improve capability parity across REST, GraphQL, gRPC, and realtime transports.
 
 ## Notes
 
 - GraphQL currently exists as schema only.
   Reference: `internal/transport/graphql/schema.graphqls`
-- gRPC currently exists as server shell and proto contract only.
-  Reference: `cmd/grpc/main.go`, `internal/transport/grpc/`
+- gRPC services are fully implemented and registered for task, user, auth, and label operations.
+  Reference: `cmd/grpc/main.go`, `internal/transport/grpc/services.go`
 - File storage is initialized, but no user-facing attachment workflow exists yet.
   Reference: `internal/infrastructure/storage/`, `migrations/000001_init.up.sql`
 
 ## Scope Summary
 
-- Working today: REST API, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, and broad automated tests.
-- Partial today: GraphQL schema, gRPC server shell without registered services, and file storage adapters without user-facing workflows.
-- Main gap today: transport parity and attachment workflows beyond the core REST surface.
+- Working today: REST API, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
+- Partial today: GraphQL schema and file storage adapters without user-facing workflows.
+- Main gap today: GraphQL HTTP endpoint, background event consumers, expanded Redis usage, and attachment workflows beyond the core REST and gRPC surfaces.
