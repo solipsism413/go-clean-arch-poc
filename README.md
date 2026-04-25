@@ -14,6 +14,7 @@ Task management application built in Go with a ports-and-adapters style architec
 ## Current Snapshot
 
 - Working HTTP server with REST routes, JWT auth, RBAC and ACL checks, and Swagger support.
+- Self-registration is available at `POST /api/v1/auth/register` and returns JWT tokens.
 - Realtime transports available through WebSocket, SSE, and Socket.IO.
 - PostgreSQL, Redis, Kafka, and S3 or MinIO bootstrap are already wired.
 - GraphQL and gRPC exist as partial scaffolding and are not yet feature-complete.
@@ -69,7 +70,6 @@ Seeded development users are created with password `password123`.
 
 ## Notes
 
-- `POST /api/v1/auth/register` still returns `501 Not Implemented`.
 - GraphQL schema exists in `internal/transport/graphql/schema.graphqls`, but no HTTP endpoint is active yet.
 - gRPC server bootstraps successfully, but application services are not registered yet.
 

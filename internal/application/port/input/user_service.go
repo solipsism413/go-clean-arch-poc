@@ -39,6 +39,9 @@ type UserService interface {
 
 // AuthService defines the input port for authentication use cases.
 type AuthService interface {
+	// Register creates a new user account and returns tokens.
+	Register(ctx context.Context, input dto.CreateUserInput) (*dto.AuthOutput, error)
+
 	// Login authenticates a user and returns tokens.
 	Login(ctx context.Context, input dto.LoginInput) (*dto.AuthOutput, error)
 

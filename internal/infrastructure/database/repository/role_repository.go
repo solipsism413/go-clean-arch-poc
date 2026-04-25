@@ -133,7 +133,24 @@ func (r *RoleRepository) FindByName(ctx context.Context, name string) (*entity.R
 		return nil, err
 	}
 
-	return sqlcRoleToEntity(row), nil
+	role := sqlcRoleToEntity(row)
+
+	permRows, err := r.queries.GetRolePermissions(ctx, role.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, permRow := range permRows {
+		role.Permissions = append(role.Permissions, entity.Permission{
+			ID:        permRow.ID,
+			Name:      permRow.Name,
+			Resource:  entity.ResourceType(permRow.Resource),
+			Action:    entity.PermissionAction(permRow.Action),
+			CreatedAt: permRow.CreatedAt,
+		})
+	}
+
+	return role, nil
 }
 
 // FindAll retrieves all roles with their permissions.

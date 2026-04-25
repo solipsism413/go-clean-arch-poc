@@ -243,7 +243,7 @@
         },
         "/auth/register": {
             "post": {
-                "description": "Registration route is reserved but not implemented yet",
+                "description": "Create a new user account and return JWT tokens",
                 "consumes": [
                     "application/json"
                 ],
@@ -266,20 +266,38 @@
                     }
                 ],
                 "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/presenter.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.AuthOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/presenter.ErrorResponse"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/presenter.ErrorResponse"
                         }
                     },
-                    "501": {
-                        "description": "Not Implemented",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/presenter.ErrorResponse"
                         }

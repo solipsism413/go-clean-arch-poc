@@ -10,10 +10,13 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/output"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	domainerror "github.com/handiism/go-clean-arch-poc/internal/domain/error"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/auth/jwt"
 )
+
+const defaultRegistrationRole = entity.RoleMember
 
 // Ensure AuthUseCase implements input.AuthService.
 var _ input.AuthService = (*AuthUseCase)(nil)
@@ -53,6 +56,52 @@ func NewAuthUseCase(
 	}
 }
 
+// Register creates a new user account and returns tokens.
+func (uc *AuthUseCase) Register(ctx context.Context, input dto.CreateUserInput) (*dto.AuthOutput, error) {
+	if err := uc.validator.Validate(input); err != nil {
+		return nil, err
+	}
+
+	exists, err := uc.userRepo.ExistsByEmail(ctx, input.Email)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, domainerror.ErrEmailAlreadyExists
+	}
+
+	role, err := uc.roleRepo.FindByName(ctx, defaultRegistrationRole)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return nil, domainerror.ErrRoleNotFound
+	}
+
+	user, err := entity.NewUser(input.Email, input.Password, input.Name)
+	if err != nil {
+		return nil, err
+	}
+	user.AssignRole(*role)
+
+	if err := uc.userRepo.Save(ctx, user); err != nil {
+		return nil, err
+	}
+
+	authOutput, err := uc.generateAuthOutput(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := uc.eventPublisher.Publish(ctx, output.TopicUserEvents, event.NewUserCreated(user.ID, user.Email, user.Name)); err != nil {
+		uc.logger.Error("failed to publish user created event", "userId", user.ID, "error", err)
+	}
+
+	uc.logger.Info("user registered", "userId", user.ID, "email", user.Email)
+
+	return authOutput, nil
+}
+
 // Login authenticates a user and returns tokens.
 func (uc *AuthUseCase) Login(ctx context.Context, input dto.LoginInput) (*dto.AuthOutput, error) {
 	// Validate input
@@ -74,26 +123,10 @@ func (uc *AuthUseCase) Login(ctx context.Context, input dto.LoginInput) (*dto.Au
 		return nil, domainerror.ErrInvalidCredentials
 	}
 
-	// Extract roles and permissions
-	roles := make([]string, 0, len(user.Roles))
-	roleIDs := make([]uuid.UUID, 0, len(user.Roles))
-	permissions := make([]string, 0)
-	for _, role := range user.Roles {
-		roles = append(roles, role.Name)
-		roleIDs = append(roleIDs, role.ID)
-		for _, perm := range role.Permissions {
-			permissions = append(permissions, string(perm.Resource)+":"+string(perm.Action))
-		}
-	}
-
-	// Generate tokens
-	authOutput, err := uc.tokenService.GenerateTokenPair(ctx, user.ID, user.Email, roles, roleIDs, permissions)
+	authOutput, err := uc.generateAuthOutput(ctx, user)
 	if err != nil {
 		return nil, err
 	}
-
-	// Add user info to output
-	authOutput.User = dto.UserFromEntity(user)
 
 	// Publish login event
 	evt := event.NewUserLoggedIn(user.ID, "", "") // IP and User-Agent can be extracted from context
@@ -146,7 +179,17 @@ func (uc *AuthUseCase) RefreshToken(ctx context.Context, refreshToken string) (*
 		return nil, domainerror.ErrUserNotFound
 	}
 
-	// Extract roles and permissions
+	authOutput, err := uc.generateAuthOutput(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	uc.logger.Debug("token refreshed", "userId", userID)
+
+	return authOutput, nil
+}
+
+func (uc *AuthUseCase) generateAuthOutput(ctx context.Context, user *entity.User) (*dto.AuthOutput, error) {
 	roles := make([]string, 0, len(user.Roles))
 	roleIDs := make([]uuid.UUID, 0, len(user.Roles))
 	permissions := make([]string, 0)
@@ -158,15 +201,12 @@ func (uc *AuthUseCase) RefreshToken(ctx context.Context, refreshToken string) (*
 		}
 	}
 
-	// Generate new tokens
 	authOutput, err := uc.tokenService.GenerateTokenPair(ctx, user.ID, user.Email, roles, roleIDs, permissions)
 	if err != nil {
 		return nil, err
 	}
 
 	authOutput.User = dto.UserFromEntity(user)
-
-	uc.logger.Debug("token refreshed", "userId", userID)
 
 	return authOutput, nil
 }

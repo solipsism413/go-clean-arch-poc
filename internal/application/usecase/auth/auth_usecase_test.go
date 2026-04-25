@@ -438,6 +438,119 @@ func createTestUserWithRoles(email, password, name string, roleNames []string) (
 	return user, nil
 }
 
+// TestAuthUseCase_Register tests the Register method.
+func TestAuthUseCase_Register(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("success", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockRoleRepo := new(MockRoleRepository)
+		mockCache := new(MockCacheRepository)
+		mockEventPublisher := new(MockEventPublisher)
+		mockTM := new(MockTransactionManager)
+		tokenService := createTestTokenService()
+		mockValidator := new(MockValidator)
+
+		uc := setupTestAuthUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, tokenService, mockValidator)
+
+		input := dto.CreateUserInput{
+			Email:    "register@example.com",
+			Password: "password123",
+			Name:     "Register User",
+		}
+
+		memberRole, err := entity.NewRole(entity.RoleMember, "Member role")
+		assert.NoError(t, err)
+		perm, err := entity.NewPermission("tasks:read", entity.ResourceTypeTasks, entity.PermissionActionRead)
+		assert.NoError(t, err)
+		memberRole.AddPermission(*perm)
+
+		mockValidator.On("Validate", input).Return(nil)
+		mockUserRepo.On("ExistsByEmail", ctx, input.Email).Return(false, nil)
+		mockRoleRepo.On("FindByName", ctx, entity.RoleMember).Return(memberRole, nil)
+		mockUserRepo.On("Save", ctx, mock.AnythingOfType("*entity.User")).Return(nil)
+		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+
+		result, err := uc.Register(ctx, input)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.NotEmpty(t, result.AccessToken)
+		assert.NotEmpty(t, result.RefreshToken)
+		assert.NotNil(t, result.User)
+		assert.Equal(t, input.Email, result.User.Email)
+		assert.Len(t, result.User.Roles, 1)
+		assert.Equal(t, entity.RoleMember, result.User.Roles[0].Name)
+
+		mockValidator.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+		mockRoleRepo.AssertExpectations(t)
+		mockEventPublisher.AssertExpectations(t)
+	})
+
+	t.Run("duplicate email", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockRoleRepo := new(MockRoleRepository)
+		mockCache := new(MockCacheRepository)
+		mockEventPublisher := new(MockEventPublisher)
+		mockTM := new(MockTransactionManager)
+		tokenService := createTestTokenService()
+		mockValidator := new(MockValidator)
+
+		uc := setupTestAuthUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, tokenService, mockValidator)
+
+		input := dto.CreateUserInput{
+			Email:    "register@example.com",
+			Password: "password123",
+			Name:     "Register User",
+		}
+
+		mockValidator.On("Validate", input).Return(nil)
+		mockUserRepo.On("ExistsByEmail", ctx, input.Email).Return(true, nil)
+
+		result, err := uc.Register(ctx, input)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, domainerror.ErrEmailAlreadyExists)
+
+		mockValidator.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("default role not found", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepository)
+		mockRoleRepo := new(MockRoleRepository)
+		mockCache := new(MockCacheRepository)
+		mockEventPublisher := new(MockEventPublisher)
+		mockTM := new(MockTransactionManager)
+		tokenService := createTestTokenService()
+		mockValidator := new(MockValidator)
+
+		uc := setupTestAuthUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, tokenService, mockValidator)
+
+		input := dto.CreateUserInput{
+			Email:    "register@example.com",
+			Password: "password123",
+			Name:     "Register User",
+		}
+
+		mockValidator.On("Validate", input).Return(nil)
+		mockUserRepo.On("ExistsByEmail", ctx, input.Email).Return(false, nil)
+		mockRoleRepo.On("FindByName", ctx, entity.RoleMember).Return(nil, nil)
+
+		result, err := uc.Register(ctx, input)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, domainerror.ErrRoleNotFound)
+
+		mockValidator.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+		mockRoleRepo.AssertExpectations(t)
+	})
+}
+
 // TestAuthUseCase_Login tests the Login method.
 func TestAuthUseCase_Login(t *testing.T) {
 	ctx := context.Background()

@@ -115,6 +115,7 @@ func SetupTestApp(t *testing.T) *TestApp {
 	authUseCase := authusecase.NewAuthUseCase(userRepo, roleRepo, cache, eventPublisher, tm, tokenService, validator, logger)
 	userUseCase := userusecase.NewUserUseCase(userRepo, roleRepo, cache, eventPublisher, tm, validator, logger)
 	taskUseCase := taskusecase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cache, eventPublisher, tm, validator, logger)
+	require.NoError(t, userUseCase.SeedSystemRoles(ctx))
 
 	// Create RBAC authorizer and ACL checker
 	authorizer := rbac.NewAuthorizer()

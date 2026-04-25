@@ -525,6 +525,11 @@ func handleError(w http.ResponseWriter, err error) {
 		return
 	}
 
+	if domainerror.IsConflictError(err) {
+		presenter.Error(w, http.StatusConflict, err.Error(), nil)
+		return
+	}
+
 	if errors.Is(err, entity.ErrInvalidStatus) || errors.Is(err, entity.ErrInvalidStatusTransition) ||
 		errors.Is(err, entity.ErrTaskArchived) || errors.Is(err, entity.ErrTaskNotDone) ||
 		errors.Is(err, valueobject.ErrInvalidTaskStatus) {

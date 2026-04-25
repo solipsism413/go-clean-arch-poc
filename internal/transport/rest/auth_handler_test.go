@@ -8,6 +8,61 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAuthHandler_Register(t *testing.T) {
+	app := SetupTestApp(t)
+	defer app.Cleanup(t)
+
+	t.Run("valid registration", func(t *testing.T) {
+		resp := app.DoRequest(t, "POST", "/api/v1/auth/register", map[string]string{
+			"email":    "register@example.com",
+			"password": "password123",
+			"name":     "Register User",
+		}, "")
+
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		result := ParseResponse[map[string]any](t, resp)
+		assert.True(t, result["success"].(bool))
+		data := result["data"].(map[string]any)
+		assert.NotEmpty(t, data["accessToken"])
+		assert.NotEmpty(t, data["refreshToken"])
+
+		user := data["user"].(map[string]any)
+		assert.Equal(t, "register@example.com", user["email"])
+		assert.Equal(t, "Register User", user["name"])
+
+		loginResp := app.DoRequest(t, "POST", "/api/v1/auth/login", map[string]string{
+			"email":    "register@example.com",
+			"password": "password123",
+		}, "")
+		assert.Equal(t, http.StatusOK, loginResp.StatusCode)
+	})
+
+	t.Run("duplicate email", func(t *testing.T) {
+		resp := app.DoRequest(t, "POST", "/api/v1/auth/register", map[string]string{
+			"email":    "duplicate@example.com",
+			"password": "password123",
+			"name":     "Duplicate User",
+		}, "")
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		_ = ParseResponse[map[string]any](t, resp)
+
+		duplicateResp := app.DoRequest(t, "POST", "/api/v1/auth/register", map[string]string{
+			"email":    "duplicate@example.com",
+			"password": "password123",
+			"name":     "Duplicate User",
+		}, "")
+
+		assert.Equal(t, http.StatusConflict, duplicateResp.StatusCode)
+	})
+
+	t.Run("invalid body", func(t *testing.T) {
+		resp := app.DoRequest(t, "POST", "/api/v1/auth/register", "invalid json body", "")
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+}
+
 func TestAuthHandler_Login(t *testing.T) {
 	app := SetupTestApp(t)
 	defer app.Cleanup(t)

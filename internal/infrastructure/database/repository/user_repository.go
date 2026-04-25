@@ -38,7 +38,11 @@ func (r *UserRepository) Save(ctx context.Context, user *entity.User) error {
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	return r.syncUserRoles(ctx, user)
 }
 
 // Update updates an existing user.
@@ -49,7 +53,11 @@ func (r *UserRepository) Update(ctx context.Context, user *entity.User) error {
 		Name:         user.Name,
 		PasswordHash: user.PasswordHash,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	return r.syncUserRoles(ctx, user)
 }
 
 // Delete removes a user by ID.
@@ -215,6 +223,45 @@ func (r *UserRepository) loadUserRoles(ctx context.Context, userID uuid.UUID) ([
 	}
 
 	return roles, nil
+}
+
+func (r *UserRepository) syncUserRoles(ctx context.Context, user *entity.User) error {
+	existingRoles, err := r.queries.GetUserRoles(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+
+	desiredRoleIDs := make(map[uuid.UUID]struct{}, len(user.Roles))
+	for _, role := range user.Roles {
+		desiredRoleIDs[role.ID] = struct{}{}
+	}
+
+	existingRoleIDs := make(map[uuid.UUID]struct{}, len(existingRoles))
+	for _, role := range existingRoles {
+		existingRoleIDs[role.ID] = struct{}{}
+		if _, ok := desiredRoleIDs[role.ID]; !ok {
+			if err := r.queries.RemoveRoleFromUser(ctx, sqlc.RemoveRoleFromUserParams{
+				UserID: user.ID,
+				RoleID: role.ID,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, role := range user.Roles {
+		if _, ok := existingRoleIDs[role.ID]; ok {
+			continue
+		}
+		if err := r.queries.AssignRoleToUser(ctx, sqlc.AssignRoleToUserParams{
+			UserID: user.ID,
+			RoleID: role.ID,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func sqlcUserToEntity(row sqlc.User) *entity.User {

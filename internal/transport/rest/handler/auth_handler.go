@@ -55,13 +55,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // Register handles POST /auth/register
 // @Summary Register user
-// @Description Registration route is reserved but not implemented yet
+// @Description Create a new user account and return JWT tokens
 // @Tags auth
 // @Accept json
 // @Produce json
 // @Param user body dto.CreateUserInput true "User details"
+// @Success 201 {object} presenter.Response{data=dto.AuthOutput}
 // @Failure 400 {object} presenter.ErrorResponse
-// @Failure 501 {object} presenter.ErrorResponse
+// @Failure 409 {object} presenter.ErrorResponse
 // @Failure 500 {object} presenter.ErrorResponse
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -71,9 +72,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Note: This would typically use UserService, but we're keeping it simple
-	// For a full implementation, inject UserService into AuthHandler
-	presenter.Error(w, http.StatusNotImplemented, "Registration not implemented", nil)
+	auth, err := h.authService.Register(r.Context(), input)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	presenter.Created(w, auth)
 }
 
 // RefreshToken handles POST /auth/refresh
