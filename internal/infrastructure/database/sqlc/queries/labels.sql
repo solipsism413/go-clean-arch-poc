@@ -10,6 +10,10 @@ RETURNING *;
 SELECT * FROM labels
 WHERE id = $1;
 
+-- name: GetLabelByName :one
+SELECT * FROM labels
+WHERE lower(name) = lower($1);
+
 -- name: ListLabels :many
 SELECT * FROM labels
 ORDER BY name;

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	authUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
+	labelUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/label"
 	taskUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
@@ -134,6 +135,7 @@ func main() {
 	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, tm, v, log)
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, tokenService, v, log)
+	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
 
 	// Initialize auth middleware
 	authMiddleware := auth.NewMiddleware(authService, userService, authorizer, aclChecker)
@@ -176,7 +178,7 @@ func main() {
 	// =====================
 	// Initialize REST Router
 	// =====================
-	router := rest.NewRouter(taskService, userService, authService, authMiddleware, aclChecker, log)
+	router := rest.NewRouter(taskService, userService, authService, labelService, authMiddleware, aclChecker, log)
 
 	// Register WebSocket handler
 	router.Handle("GET /ws", websocket.NewHandler(wsHub, taskService, authService, log))

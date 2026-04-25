@@ -3,19 +3,15 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
-	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
 	"github.com/handiism/go-clean-arch-poc/internal/auth"
 	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
-	domainerror "github.com/handiism/go-clean-arch-poc/internal/domain/error"
-	"github.com/handiism/go-clean-arch-poc/internal/domain/valueobject"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 )
 
@@ -125,7 +121,11 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		filter.Priority = &priority
 	}
 
-	pagination := parsePagination(r)
+	pagination, err := parsePagination(r)
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
 
 	tasks, err := h.taskService.ListTasks(r.Context(), filter, pagination)
 	if err != nil {
@@ -506,87 +506,4 @@ func (h *TaskHandler) checkACL(w http.ResponseWriter, r *http.Request, resourceI
 	}
 
 	return true
-}
-
-// handleError maps domain errors to HTTP responses.
-func handleError(w http.ResponseWriter, err error) {
-	if validationErr, ok := err.(*validation.ValidationError); ok {
-		presenter.ValidationError(w, validationErr)
-		return
-	}
-
-	if domainerror.IsNotFoundError(err) {
-		presenter.Error(w, http.StatusNotFound, err.Error(), nil)
-		return
-	}
-
-	if domainerror.IsValidationError(err) {
-		presenter.Error(w, http.StatusBadRequest, err.Error(), nil)
-		return
-	}
-
-	if domainerror.IsConflictError(err) {
-		presenter.Error(w, http.StatusConflict, err.Error(), nil)
-		return
-	}
-
-	if errors.Is(err, entity.ErrInvalidStatus) || errors.Is(err, entity.ErrInvalidStatusTransition) ||
-		errors.Is(err, entity.ErrTaskArchived) || errors.Is(err, entity.ErrTaskNotDone) ||
-		errors.Is(err, valueobject.ErrInvalidTaskStatus) {
-		presenter.Error(w, http.StatusBadRequest, err.Error(), nil)
-		return
-	}
-
-	if domainerror.IsUnauthorizedError(err) {
-		presenter.Error(w, http.StatusUnauthorized, err.Error(), nil)
-		return
-	}
-
-	if domainerror.IsForbiddenError(err) {
-		presenter.Error(w, http.StatusForbidden, err.Error(), nil)
-		return
-	}
-
-	presenter.Error(w, http.StatusInternalServerError, "Internal server error", err)
-}
-
-// parsePagination extracts pagination parameters from the request.
-func parsePagination(r *http.Request) dto.Pagination {
-	pagination := dto.DefaultPagination()
-
-	if page := r.URL.Query().Get("page"); page != "" {
-		if p, err := parsePositiveInt(page); err == nil {
-			pagination.Page = p
-		}
-	}
-
-	if pageSize := r.URL.Query().Get("pageSize"); pageSize != "" {
-		if ps, err := parsePositiveInt(pageSize); err == nil && ps <= 100 {
-			pagination.PageSize = ps
-		}
-	}
-
-	if sortBy := r.URL.Query().Get("sortBy"); sortBy != "" {
-		pagination.SortBy = sortBy
-	}
-
-	if sortDesc := r.URL.Query().Get("sortDesc"); sortDesc == "true" {
-		pagination.SortDesc = true
-	}
-
-	return pagination
-}
-
-func parsePositiveInt(s string) (int, error) {
-	var n int
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, nil
-		}
-		n = n*10 + int(c-'0')
-	}
-	if n <= 0 {
-		return 1, nil
-	}
-	return n, nil
 }

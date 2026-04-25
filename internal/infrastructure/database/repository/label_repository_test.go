@@ -144,6 +144,37 @@ func TestLabelRepository_FindAll(t *testing.T) {
 	assert.Len(t, all, 3)
 }
 
+func TestLabelRepository_FindByName(t *testing.T) {
+	testDB := SetupTestDatabase(t)
+	defer testDB.Cleanup(t)
+
+	ctx := context.Background()
+	repo := repository.NewLabelRepository(testDB.Pool)
+
+	label := &entity.Label{
+		ID:        uuid.New(),
+		Name:      "Bug",
+		Color:     "#FF0000",
+		CreatedAt: time.Now().UTC().Truncate(time.Microsecond),
+		UpdatedAt: time.Now().UTC().Truncate(time.Microsecond),
+	}
+	require.NoError(t, repo.Save(ctx, label))
+
+	t.Run("find existing label case-insensitively", func(t *testing.T) {
+		found, err := repo.FindByName(ctx, "bug")
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.Equal(t, label.ID, found.ID)
+		assert.Equal(t, label.Name, found.Name)
+	})
+
+	t.Run("find non-existent label returns nil", func(t *testing.T) {
+		found, err := repo.FindByName(ctx, "nonexistent")
+		require.NoError(t, err)
+		assert.Nil(t, found)
+	})
+}
+
 func TestLabelRepository_ExistsByID(t *testing.T) {
 	testDB := SetupTestDatabase(t)
 	defer testDB.Cleanup(t)

@@ -44,7 +44,7 @@ func main() {
 
 	log.Info("starting task manager gRPC server",
 		"host", cfg.Server.Host,
-		"port", 9090,
+		"port", cfg.GRPC.Port,
 	)
 
 	// Initialize database connection
@@ -123,7 +123,7 @@ func main() {
 	// I assume they are registered inside grpcTransport.NewServer or should be done here.
 	// Based on my previous grep, RegisterTaskServiceServer was not found in internal/transport/grpc.
 
-	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, 9090)
+	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.GRPC.Port)
 	if err := grpcServer.Start(ctx, grpcAddr); err != nil {
 		log.Error("failed to start gRPC server", "error", err)
 		os.Exit(1)

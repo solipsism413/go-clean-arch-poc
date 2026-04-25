@@ -1,6 +1,6 @@
 # Task Manager - Makefile
 
-.PHONY: all build run test clean docker-up docker-watch docker-down setup-infra migrate generate lint fmt help seed-db
+.PHONY: all build run test clean docker-up docker-watch docker-down setup-infra migrate-up migrate-down migrate-create generate lint fmt help seed-db
 
 # Variables
 APP_NAME := task-manager
@@ -10,6 +10,7 @@ BUILD_DIR := ./bin
 API_MAIN := ./cmd/server
 GRPC_MAIN := ./cmd/grpc
 DOCKER_COMPOSE := docker compose
+DB_MIGRATE_URL := postgres://$(or $(DB_USER),taskmanager):$(or $(DB_PASSWORD),taskmanager_secret)@localhost:$(or $(POSTGRES_EXTERNAL_PORT),5433)/$(or $(DB_NAME),taskmanager)?sslmode=$(or $(DB_SSLMODE),disable)
 
 # Build both services
 build: build-api build-grpc
@@ -87,7 +88,7 @@ setup-infra:
 	@echo "Waiting for services to be healthy..."
 	@sleep 5
 	@echo "Running migrations..."
-	$(DOCKER_COMPOSE) run --rm migrate
+	$(MAKE) migrate-up
 	@echo "Infrastructure setup complete!"
 	@echo "Services running:"
 	@echo "  - PostgreSQL: localhost:5433"
@@ -98,12 +99,17 @@ setup-infra:
 # Run database migrations
 migrate-up:
 	@echo "Running migrations..."
-	$(DOCKER_COMPOSE) run --rm migrate
+	migrate -database "$(DB_MIGRATE_URL)" -path migrations up
 
 # Rollback database migrations
 migrate-down:
 	@echo "Rolling back migrations..."
-	migrate -database "postgres://postgres:postgres@localhost:5433/taskmanager?sslmode=disable" -path migrations down 1
+	migrate -database "$(DB_MIGRATE_URL)" -path migrations down 1
+
+# Create a new database migration
+migrate-create:
+	@test -n "$(name)" || (echo "Usage: make migrate-create name=add_descriptive_name" && exit 1)
+	@migrate create -ext sql -dir migrations -seq $(name)
 
 # Generate SQLC code
 generate-sqlc:
@@ -168,6 +174,7 @@ help:
 	@echo "  docker-watch    - Start Docker services with Compose watch"
 	@echo "  docker-down     - Stop Docker services"
 	@echo "  setup-infra     - Setup infrastructure services (postgres, redis, kafka, minio)"
+	@echo "  migrate-create  - Create a new migration (use name=...)"
 	@echo "  migrate-up      - Run database migrations"
 	@echo "  migrate-down    - Rollback last migration"
 	@echo "  generate-sqlc   - Generate SQLC code"

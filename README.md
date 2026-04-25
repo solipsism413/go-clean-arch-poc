@@ -15,6 +15,7 @@ Task management application built in Go with a ports-and-adapters style architec
 
 - Working HTTP server with REST routes, JWT auth, RBAC and ACL checks, and Swagger support.
 - Self-registration is available at `POST /api/v1/auth/register` and returns JWT tokens.
+- Label CRUD is available over REST with case-insensitive unique names.
 - Realtime transports available through WebSocket, SSE, and Socket.IO.
 - PostgreSQL, Redis, Kafka, and S3 or MinIO bootstrap are already wired.
 - GraphQL and gRPC exist as partial scaffolding and are not yet feature-complete.
@@ -60,6 +61,9 @@ go run ./cmd/grpc
 ```bash
 make run-api
 make run-grpc
+make migrate-create name=add_descriptive_name
+make migrate-up
+make migrate-down
 make seed-db
 make test
 make generate
@@ -70,8 +74,9 @@ Seeded development users are created with password `password123`.
 
 ## Notes
 
+- Invalid pagination query params now return `400 Bad Request` instead of being silently coerced.
 - GraphQL schema exists in `internal/transport/graphql/schema.graphqls`, but no HTTP endpoint is active yet.
-- gRPC server bootstraps successfully, but application services are not registered yet.
+- gRPC server bootstraps successfully on `cfg.GRPC.Port`, but application services are not registered yet.
 
 ## License
 

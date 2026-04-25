@@ -23,6 +23,18 @@ definitions:
     - newPassword
     - oldPassword
     type: object
+  dto.CreateLabelInput:
+    properties:
+      color:
+        type: string
+      name:
+        maxLength: 50
+        minLength: 1
+        type: string
+    required:
+    - color
+    - name
+    type: object
   dto.CreateTaskInput:
     properties:
       assigneeId:
@@ -168,6 +180,15 @@ definitions:
       title:
         type: string
       updatedAt:
+        type: string
+    type: object
+  dto.UpdateLabelInput:
+    properties:
+      color:
+        type: string
+      name:
+        maxLength: 50
+        minLength: 1
         type: string
     type: object
   dto.UpdateTaskInput:
@@ -465,6 +486,223 @@ paths:
       summary: Register user
       tags:
       - auth
+  /labels:
+    get:
+      consumes:
+      - application/json
+      description: Get all available labels
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/presenter.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.LabelOutput'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List labels
+      tags:
+      - labels
+    post:
+      consumes:
+      - application/json
+      description: Create a new label
+      parameters:
+      - description: Label details
+        in: body
+        name: label
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateLabelInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/presenter.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.LabelOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create label
+      tags:
+      - labels
+  /labels/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a label by ID
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete label
+      tags:
+      - labels
+    get:
+      consumes:
+      - application/json
+      description: Get a label by ID
+      parameters:
+      - description: Label ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/presenter.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.LabelOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get label
+      tags:
+      - labels
+    put:
+      consumes:
+      - application/json
+      description: Update an existing label
+      parameters:
+      - description: Label ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label updates
+        in: body
+        name: label
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateLabelInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/presenter.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.LabelOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update label
+      tags:
+      - labels
   /tasks:
     get:
       consumes:

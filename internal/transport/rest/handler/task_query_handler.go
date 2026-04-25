@@ -44,7 +44,11 @@ func (h *TaskQueryHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pagination := parsePagination(r)
+	pagination, err := parsePagination(r)
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
 
 	tasks, err := h.taskService.SearchTasks(r.Context(), query, pagination)
 	if err != nil {
@@ -69,7 +73,11 @@ func (h *TaskQueryHandler) Search(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Router /tasks/overdue [get]
 func (h *TaskQueryHandler) Overdue(w http.ResponseWriter, r *http.Request) {
-	pagination := parsePagination(r)
+	pagination, err := parsePagination(r)
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
 
 	tasks, err := h.taskService.GetOverdueTasks(r.Context(), pagination)
 	if err != nil {

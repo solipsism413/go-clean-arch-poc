@@ -74,6 +74,25 @@ func (r *LabelRepository) FindByID(ctx context.Context, id uuid.UUID) (*entity.L
 	}, nil
 }
 
+// FindByName retrieves a label by name using case-insensitive matching.
+func (r *LabelRepository) FindByName(ctx context.Context, name string) (*entity.Label, error) {
+	row, err := r.queries.GetLabelByName(ctx, name)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &entity.Label{
+		ID:        row.ID,
+		Name:      row.Name,
+		Color:     row.Color,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}, nil
+}
+
 // FindAll retrieves all labels.
 func (r *LabelRepository) FindAll(ctx context.Context) ([]*entity.Label, error) {
 	rows, err := r.queries.ListLabels(ctx)

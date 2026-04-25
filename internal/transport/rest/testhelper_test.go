@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	authusecase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
+	labelusecase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/label"
 	taskusecase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userusecase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
@@ -115,6 +116,7 @@ func SetupTestApp(t *testing.T) *TestApp {
 	authUseCase := authusecase.NewAuthUseCase(userRepo, roleRepo, cache, eventPublisher, tm, tokenService, validator, logger)
 	userUseCase := userusecase.NewUserUseCase(userRepo, roleRepo, cache, eventPublisher, tm, validator, logger)
 	taskUseCase := taskusecase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cache, eventPublisher, tm, validator, logger)
+	labelUseCase := labelusecase.NewLabelUseCase(labelRepo, validator, logger)
 	require.NoError(t, userUseCase.SeedSystemRoles(ctx))
 
 	// Create RBAC authorizer and ACL checker
@@ -125,7 +127,7 @@ func SetupTestApp(t *testing.T) *TestApp {
 	authMiddleware := auth.NewMiddleware(authUseCase, userUseCase, authorizer, aclChecker)
 
 	// Create REST router
-	router := rest.NewRouter(taskUseCase, userUseCase, authUseCase, authMiddleware, aclChecker, logger)
+	router := rest.NewRouter(taskUseCase, userUseCase, authUseCase, labelUseCase, authMiddleware, aclChecker, logger)
 
 	// Create test server
 	server := httptest.NewServer(router)

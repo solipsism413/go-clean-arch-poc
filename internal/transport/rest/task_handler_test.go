@@ -276,3 +276,83 @@ func TestTaskHandler_Assign(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 }
+
+func TestTaskHandler_HappyPathFlow(t *testing.T) {
+	app := SetupTestApp(t)
+	defer app.Cleanup(t)
+
+	user := app.CreateTestUser(t, "task-flow@example.com", "password123")
+	user.AccessToken = createAuthorizedToken(t, app, user.ID, user.Email, []string{entity.RoleAdmin}, []string{"tasks:*"})
+
+	createResp := app.DoRequest(t, "POST", "/api/v1/tasks", map[string]any{
+		"title":       "Flow Task",
+		"description": "Task flow description",
+		"priority":    "HIGH",
+	}, user.AccessToken)
+	require.Equal(t, http.StatusCreated, createResp.StatusCode)
+
+	created := ParseResponse[map[string]any](t, createResp)
+	taskID := created["data"].(map[string]any)["id"].(string)
+	taskUUID, err := uuid.Parse(taskID)
+	require.NoError(t, err)
+
+	_, err = app.Pool.Exec(context.Background(), `
+		INSERT INTO acl_entries (resource_type, resource_id, subject_type, subject_id, permission, created_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+	`, "task", taskUUID, "user", user.ID, "admin")
+	require.NoError(t, err)
+
+	t.Run("get created task", func(t *testing.T) {
+		resp := app.DoRequest(t, "GET", "/api/v1/tasks/"+taskID, nil, user.AccessToken)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		result := ParseResponse[map[string]any](t, resp)
+		assert.Equal(t, "Flow Task", result["data"].(map[string]any)["title"])
+	})
+
+	t.Run("update created task", func(t *testing.T) {
+		resp := app.DoRequest(t, "PUT", "/api/v1/tasks/"+taskID, map[string]any{
+			"title": "Flow Task Updated",
+		}, user.AccessToken)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		result := ParseResponse[map[string]any](t, resp)
+		assert.Equal(t, "Flow Task Updated", result["data"].(map[string]any)["title"])
+	})
+
+	t.Run("complete created task", func(t *testing.T) {
+		resp := app.DoRequest(t, "POST", "/api/v1/tasks/"+taskID+"/complete", nil, user.AccessToken)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		result := ParseResponse[map[string]any](t, resp)
+		assert.Equal(t, "DONE", result["data"].(map[string]any)["status"])
+	})
+
+	t.Run("delete created task", func(t *testing.T) {
+		resp := app.DoRequest(t, "DELETE", "/api/v1/tasks/"+taskID, nil, user.AccessToken)
+		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+	})
+}
+
+func TestTaskHandler_InvalidPaginationParams(t *testing.T) {
+	app := SetupTestApp(t)
+	defer app.Cleanup(t)
+
+	user := app.CreateTestUser(t, "task-pagination@example.com", "password123")
+
+	cases := []string{
+		"/api/v1/tasks?page=abc",
+		"/api/v1/tasks?page=0",
+		"/api/v1/tasks?pageSize=-1",
+		"/api/v1/tasks?pageSize=999",
+		"/api/v1/tasks/search?q=test&sortDesc=not-bool",
+		"/api/v1/tasks/overdue?page=abc",
+	}
+
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			resp := app.DoRequest(t, "GET", path, nil, user.AccessToken)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		})
+	}
+}

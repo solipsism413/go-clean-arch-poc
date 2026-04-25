@@ -13,6 +13,7 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/handler"
 	customMiddleware "github.com/handiism/go-clean-arch-poc/internal/transport/rest/middleware"
+	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 
 	_ "github.com/handiism/go-clean-arch-poc/docs/api/swagger" // Swagger docs
 	httpSwagger "github.com/swaggo/http-swagger/v2"
@@ -25,6 +26,7 @@ type Router struct {
 	taskQueryHandler *handler.TaskQueryHandler
 	userHandler      *handler.UserHandler
 	authHandler      *handler.AuthHandler
+	labelHandler     *handler.LabelHandler
 	authService      input.AuthService
 	authMiddleware   *auth.Middleware
 	logger           *slog.Logger
@@ -35,6 +37,7 @@ func NewRouter(
 	taskService input.TaskService,
 	userService input.UserService,
 	authService input.AuthService,
+	labelService input.LabelService,
 	authMiddleware *auth.Middleware,
 	aclChecker *acl.Checker,
 	logger *slog.Logger,
@@ -47,6 +50,7 @@ func NewRouter(
 		taskQueryHandler: handler.NewTaskQueryHandler(taskService, logger),
 		userHandler:      handler.NewUserHandler(userService, aclChecker, logger),
 		authHandler:      handler.NewAuthHandler(authService, logger),
+		labelHandler:     handler.NewLabelHandler(labelService, logger),
 		authService:      authService,
 		authMiddleware:   authMiddleware,
 		logger:           logger,
@@ -95,6 +99,11 @@ func (r *Router) registerRoutes() {
 	r.mux.HandleFunc("POST /api/v1/tasks/{id}/status", r.withAuth(r.taskHandler.ChangeStatus))
 	r.mux.HandleFunc("POST /api/v1/tasks/{id}/labels/{labelId}", r.withAuth(r.taskHandler.AddLabel))
 	r.mux.HandleFunc("DELETE /api/v1/tasks/{id}/labels/{labelId}", r.withAuth(r.taskHandler.RemoveLabel))
+	r.mux.HandleFunc("GET /api/v1/labels", r.withAuth(r.labelHandler.List))
+	r.mux.HandleFunc("GET /api/v1/labels/{id}", r.withAuth(r.labelHandler.Get))
+	r.mux.HandleFunc("POST /api/v1/labels", r.withAnyRole(r.labelHandler.Create, entity.RoleAdmin, entity.RoleManager))
+	r.mux.HandleFunc("PUT /api/v1/labels/{id}", r.withAnyRole(r.labelHandler.Update, entity.RoleAdmin, entity.RoleManager))
+	r.mux.HandleFunc("DELETE /api/v1/labels/{id}", r.withAnyRole(r.labelHandler.Delete, entity.RoleAdmin, entity.RoleManager))
 
 	// User routes (protected)
 	r.mux.HandleFunc("GET /api/v1/users", r.withPermission(entity.ResourceTypeUsers, entity.PermissionActionRead, r.userHandler.List))
@@ -122,14 +131,14 @@ func (r *Router) withAuth(h http.HandlerFunc) http.HandlerFunc {
 		// Get token from Authorization header
 		authHeader := req.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, `{"success":false,"error":{"code":"UNAUTHORIZED","message":"Missing authorization header"}}`, http.StatusUnauthorized)
+			presenter.Error(w, http.StatusUnauthorized, "Missing authorization header", nil)
 			return
 		}
 
 		// Extract Bearer token
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			http.Error(w, `{"success":false,"error":{"code":"UNAUTHORIZED","message":"Invalid authorization header format"}}`, http.StatusUnauthorized)
+			presenter.Error(w, http.StatusUnauthorized, "Invalid authorization header format", nil)
 			return
 		}
 
@@ -138,7 +147,7 @@ func (r *Router) withAuth(h http.HandlerFunc) http.HandlerFunc {
 		// Validate token
 		claims, err := r.authService.ValidateToken(req.Context(), token)
 		if err != nil {
-			http.Error(w, `{"success":false,"error":{"code":"UNAUTHORIZED","message":"Invalid or expired token"}}`, http.StatusUnauthorized)
+			presenter.Error(w, http.StatusUnauthorized, "Invalid or expired token", err)
 			return
 		}
 
@@ -149,6 +158,15 @@ func (r *Router) withAuth(h http.HandlerFunc) http.HandlerFunc {
 		ctx = context.WithValue(ctx, auth.ClaimsContextKey, claims)
 
 		h(w, req.WithContext(ctx))
+	}
+}
+
+// withAnyRole wraps a handler with role-based authorization middleware.
+func (r *Router) withAnyRole(h http.HandlerFunc, roleNames ...string) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		roleMiddleware := r.authMiddleware.RequireAnyRole(roleNames...)
+		handler := roleMiddleware(http.HandlerFunc(h))
+		r.withAuth(handler.ServeHTTP)(w, req)
 	}
 }
 

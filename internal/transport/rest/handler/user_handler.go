@@ -52,7 +52,11 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 		Search: r.URL.Query().Get("search"),
 	}
 
-	pagination := parsePagination(r)
+	pagination, err := parsePagination(r)
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
 
 	users, err := h.userService.ListUsers(r.Context(), filter, pagination)
 	if err != nil {

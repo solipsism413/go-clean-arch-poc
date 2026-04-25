@@ -117,6 +117,9 @@ type LabelRepository interface {
 	// FindByID retrieves a label by ID.
 	FindByID(ctx context.Context, id uuid.UUID) (*entity.Label, error)
 
+	// FindByName retrieves a label by name using case-insensitive matching.
+	FindByName(ctx context.Context, name string) (*entity.Label, error)
+
 	// FindAll retrieves all labels.
 	FindAll(ctx context.Context) ([]*entity.Label, error)
 

@@ -12,6 +12,7 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
 	"github.com/handiism/go-clean-arch-poc/internal/auth/rbac"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
+	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 )
 
 // ContextKey is a type for context keys.
@@ -48,13 +49,13 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		// Get token from Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, `{"error":"missing authorization header"}`, http.StatusUnauthorized)
+			presenter.Error(w, http.StatusUnauthorized, "Missing authorization header", nil)
 			return
 		}
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			http.Error(w, `{"error":"invalid authorization header format"}`, http.StatusUnauthorized)
+			presenter.Error(w, http.StatusUnauthorized, "Invalid authorization header format", nil)
 			return
 		}
 
@@ -63,7 +64,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		// Validate token
 		claims, err := m.authService.ValidateToken(r.Context(), token)
 		if err != nil {
-			http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
+			presenter.Error(w, http.StatusUnauthorized, "Invalid or expired token", err)
 			return
 		}
 
@@ -108,12 +109,12 @@ func (m *Middleware) RequirePermission(resource entity.ResourceType, action enti
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims := GetClaimsFromContext(r.Context())
 			if claims == nil {
-				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+				presenter.Error(w, http.StatusUnauthorized, "Authentication required", nil)
 				return
 			}
 
 			if !m.authorizer.HasPermissionFromClaims(claims.Roles, claims.Permissions, resource, action) {
-				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				presenter.Error(w, http.StatusForbidden, "Insufficient permissions", nil)
 				return
 			}
 
@@ -128,12 +129,12 @@ func (m *Middleware) RequireRole(roleName string) func(http.Handler) http.Handle
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims := GetClaimsFromContext(r.Context())
 			if claims == nil {
-				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+				presenter.Error(w, http.StatusUnauthorized, "Authentication required", nil)
 				return
 			}
 
 			if !m.authorizer.HasRoleFromClaims(claims.Roles, roleName) {
-				http.Error(w, `{"error":"insufficient role"}`, http.StatusForbidden)
+				presenter.Error(w, http.StatusForbidden, "Insufficient role", nil)
 				return
 			}
 
@@ -148,12 +149,12 @@ func (m *Middleware) RequireAnyRole(roleNames ...string) func(http.Handler) http
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims := GetClaimsFromContext(r.Context())
 			if claims == nil {
-				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+				presenter.Error(w, http.StatusUnauthorized, "Authentication required", nil)
 				return
 			}
 
 			if !m.authorizer.HasAnyRoleFromClaims(claims.Roles, roleNames...) {
-				http.Error(w, `{"error":"insufficient role"}`, http.StatusForbidden)
+				presenter.Error(w, http.StatusForbidden, "Insufficient role", nil)
 				return
 			}
 
@@ -168,31 +169,31 @@ func (m *Middleware) RequireResourcePermission(resourceType entity.ResourceType,
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims := GetClaimsFromContext(r.Context())
 			if claims == nil {
-				http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+				presenter.Error(w, http.StatusUnauthorized, "Authentication required", nil)
 				return
 			}
 
 			// Get resource ID from path parameter
 			idStr := r.PathValue(idParam)
 			if idStr == "" {
-				http.Error(w, `{"error":"resource ID missing"}`, http.StatusBadRequest)
+				presenter.Error(w, http.StatusBadRequest, "Resource ID missing", nil)
 				return
 			}
 
 			resourceID, err := uuid.Parse(idStr)
 			if err != nil {
-				http.Error(w, `{"error":"invalid resource ID"}`, http.StatusBadRequest)
+				presenter.Error(w, http.StatusBadRequest, "Invalid resource ID", err)
 				return
 			}
 
 			hasAccess, err := m.aclChecker.CanAccess(r.Context(), claims.UserID, claims.RoleIDs, resourceType, resourceID, permission)
 			if err != nil {
-				http.Error(w, `{"error":"error checking access"}`, http.StatusInternalServerError)
+				presenter.Error(w, http.StatusInternalServerError, "Error checking access", err)
 				return
 			}
 
 			if !hasAccess {
-				http.Error(w, `{"error":"insufficient permissions for this resource"}`, http.StatusForbidden)
+				presenter.Error(w, http.StatusForbidden, "Insufficient permissions for this resource", nil)
 				return
 			}
 
