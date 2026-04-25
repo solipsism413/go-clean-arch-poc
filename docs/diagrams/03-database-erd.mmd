@@ -1,0 +1,96 @@
+erDiagram
+    USERS ||--o{ USER_ROLES : has
+    ROLES ||--o{ USER_ROLES : assigned_to
+    ROLES ||--o{ ROLE_PERMISSIONS : grants
+    PERMISSIONS ||--o{ ROLE_PERMISSIONS : mapped_to
+    USERS ||--o{ TASKS : creates
+    USERS ||--o{ TASKS : assigned_to
+    TASKS ||--o{ TASK_LABELS : tagged_by
+    LABELS ||--o{ TASK_LABELS : maps_to
+    TASKS ||--o{ TASK_ATTACHMENTS : contains
+    USERS ||--o{ TASK_ATTACHMENTS : uploads
+
+    USERS {
+        uuid id PK
+        varchar email
+        varchar password_hash
+        varchar name
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ROLES {
+        uuid id PK
+        varchar name
+        text description
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    PERMISSIONS {
+        uuid id PK
+        varchar name
+        varchar resource
+        varchar action
+        timestamptz created_at
+    }
+
+    USER_ROLES {
+        uuid user_id FK
+        uuid role_id FK
+        timestamptz created_at
+    }
+
+    ROLE_PERMISSIONS {
+        uuid role_id FK
+        uuid permission_id FK
+        timestamptz created_at
+    }
+
+    LABELS {
+        uuid id PK
+        varchar name
+        varchar color
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    TASKS {
+        uuid id PK
+        varchar title
+        text description
+        varchar status
+        varchar priority
+        timestamptz due_date
+        uuid assignee_id FK
+        uuid creator_id FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    TASK_LABELS {
+        uuid task_id FK
+        uuid label_id FK
+        timestamptz created_at
+    }
+
+    ACL_ENTRIES {
+        uuid id PK
+        varchar resource_type
+        uuid resource_id
+        varchar subject_type
+        uuid subject_id
+        varchar permission
+        timestamptz created_at
+    }
+
+    TASK_ATTACHMENTS {
+        uuid id PK
+        uuid task_id FK
+        varchar filename
+        varchar s3_key
+        varchar content_type
+        bigint size_bytes
+        uuid uploaded_by FK
+        timestamptz created_at
+    }

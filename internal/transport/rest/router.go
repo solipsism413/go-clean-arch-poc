@@ -14,7 +14,7 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/handler"
 	customMiddleware "github.com/handiism/go-clean-arch-poc/internal/transport/rest/middleware"
 
-	_ "github.com/handiism/go-clean-arch-poc/docs" // Swagger docs
+	_ "github.com/handiism/go-clean-arch-poc/docs/api/swagger" // Swagger docs
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 

@@ -1,0 +1,34 @@
+sequenceDiagram
+    participant Client
+    participant AuthHandler as Auth Handler
+    participant AuthUC as Auth Use Case
+    participant UserRepo as User Repository
+    participant JWT as JWT Token Service
+    participant Router as REST Router
+    participant RBAC as RBAC Middleware
+    participant ACL as ACL Checker
+    participant Handler as Protected Handler
+
+    Client->>AuthHandler: POST /api/v1/auth/login
+    AuthHandler->>AuthUC: Login(ctx, credentials)
+    AuthUC->>UserRepo: FindByEmail(ctx, email)
+    UserRepo-->>AuthUC: user with roles
+    AuthUC->>AuthUC: verify password
+    AuthUC->>JWT: GenerateTokenPair(...)
+    JWT-->>AuthUC: access and refresh tokens
+    AuthUC-->>AuthHandler: auth output
+    AuthHandler-->>Client: 200 OK with tokens
+
+    Client->>Router: request protected endpoint with Bearer token
+    Router->>JWT: ValidateToken(ctx, token)
+    JWT-->>Router: token claims
+    Router->>RBAC: RequirePermission(resource, action)
+    RBAC-->>Router: role-based decision
+
+    alt resource-specific access required
+        Router->>ACL: check subject access to resource
+        ACL-->>Router: allow or deny
+    end
+
+    Router->>Handler: request with claims in context
+    Handler-->>Client: success or domain error response

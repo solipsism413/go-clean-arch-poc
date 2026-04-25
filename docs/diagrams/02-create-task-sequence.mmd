@@ -1,0 +1,45 @@
+sequenceDiagram
+    participant Client
+    participant REST as REST Handler
+    participant Auth as Auth Middleware
+    participant UC as TaskUseCase
+    participant Domain as Task Entity
+    participant UserRepo as User Repository
+    participant LabelRepo as Label Repository
+    participant TaskRepo as Task Repository
+    participant DB as PostgreSQL
+    participant Event as Event Publisher
+    participant Kafka as Kafka
+
+    Client->>Auth: POST /api/v1/tasks
+    Auth->>REST: authenticated request context
+    REST->>UC: CreateTask(ctx, input)
+    UC->>UC: validate DTO and parse priority
+    UC->>Domain: NewTask(title, description, priority, creatorID)
+    Domain-->>UC: task entity
+
+    alt assignee provided
+        UC->>UserRepo: ExistsByID(ctx, assigneeID)
+        UserRepo->>DB: SELECT user existence
+        DB-->>UserRepo: result
+        UserRepo-->>UC: exists or not
+    end
+
+    loop each label ID
+        UC->>LabelRepo: ExistsByID(ctx, labelID)
+        LabelRepo->>DB: SELECT label existence
+        DB-->>LabelRepo: result
+        LabelRepo-->>UC: exists or not
+    end
+
+    UC->>TaskRepo: Save(ctx, task)
+    TaskRepo->>DB: INSERT task and label relations
+    DB-->>TaskRepo: success
+    TaskRepo-->>UC: success
+
+    UC->>Event: Publish(task created event)
+    Event->>Kafka: produce message if configured
+    Kafka-->>Event: ack or error
+
+    UC-->>REST: task output DTO
+    REST-->>Client: 201 Created

@@ -118,7 +118,7 @@ generate-grpc:
 # Generate Swagger documentation
 generate-swagger:
 	@echo "Generating Swagger documentation..."
-	swag init -g cmd/server/main.go -o docs
+	swag init -g cmd/server/main.go -o docs/api/swagger
 
 # Generate all code
 generate: generate-sqlc generate-swagger

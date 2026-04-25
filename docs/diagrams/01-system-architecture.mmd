@@ -1,0 +1,76 @@
+flowchart TD
+    Client[Client Apps]
+    Admin[Admin or Developer]
+
+    subgraph EntryPoints[Runtime Entrypoints]
+        HTTPMain[cmd/server/main.go]
+        GRPCMain[cmd/grpc/main.go]
+    end
+
+    subgraph Transport[Transport Layer]
+        REST[REST Router and Handlers]
+        WS[WebSocket]
+        SSE[SSE]
+        SIO[Socket.IO]
+        GQL[GraphQL Schema Only]
+        GRPC[gRPC Server Shell]
+    end
+
+    subgraph Application[Application Layer]
+        InputPorts[Input Ports]
+        UseCases[Auth, Task, User Use Cases]
+        OutputPorts[Output Ports]
+    end
+
+    subgraph Domain[Domain Layer]
+        Entities[Entities]
+        ValueObjects[Value Objects]
+        Events[Domain Events]
+        DomainErrors[Domain Errors]
+    end
+
+    subgraph Infrastructure[Infrastructure Layer]
+        DB[(PostgreSQL)]
+        Repo[Repositories and SQLC]
+        Cache[(Redis or Memory Cache)]
+        Broker[(Kafka or Memory Event Bus)]
+        Storage[(S3 or Local Storage)]
+        JWT[JWT Token Service]
+        Obs[Logging and Tracing]
+    end
+
+    Client --> REST
+    Client --> WS
+    Client --> SSE
+    Client --> SIO
+    Admin --> HTTPMain
+    Admin --> GRPCMain
+
+    HTTPMain --> REST
+    HTTPMain --> WS
+    HTTPMain --> SSE
+    HTTPMain --> SIO
+    GRPCMain --> GRPC
+
+    REST --> InputPorts
+    WS --> InputPorts
+    SSE --> InputPorts
+    SIO --> InputPorts
+    GRPC -. planned .-> InputPorts
+    GQL -. planned .-> InputPorts
+
+    InputPorts --> UseCases
+    UseCases --> Domain
+    UseCases --> OutputPorts
+
+    OutputPorts --> Repo
+    OutputPorts --> Cache
+    OutputPorts --> Broker
+    OutputPorts --> Storage
+    UseCases --> JWT
+    HTTPMain --> Obs
+    GRPCMain --> Obs
+
+    Repo --> DB
+
+    classDef planned stroke-dasharray: 5 5;
