@@ -11,14 +11,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/handiism/go-clean-arch-poc/internal/application/port/output"
 	authUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
 	labelUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/label"
 	taskUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
+	"github.com/handiism/go-clean-arch-poc/internal/application/worker"
 	"github.com/handiism/go-clean-arch-poc/internal/auth"
 	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
 	"github.com/handiism/go-clean-arch-poc/internal/auth/rbac"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/auth/jwt"
 	redisCache "github.com/handiism/go-clean-arch-poc/internal/infrastructure/cache/redis"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
@@ -102,6 +105,17 @@ func main() {
 		defer eventPublisher.Close()
 	}
 
+	// Initialize Kafka event subscriber for background consumers
+	var eventSubscriber output.EventSubscriber
+	sub, err := kafka.NewEventSubscriber(ctx, cfg.Kafka, log)
+	if err != nil {
+		log.Warn("failed to initialize kafka event subscriber, background consumers will not run", "error", err)
+	} else {
+		eventSubscriber = sub
+		log.Info("connected to kafka event subscriber")
+		defer sub.Close()
+	}
+
 	// Initialize S3 file storage
 	fileStorage, err := s3Storage.NewFileStorage(ctx, cfg.S3, log)
 	if err != nil {
@@ -136,6 +150,34 @@ func main() {
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, tokenService, v, log)
 	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
+
+	// Initialize background event consumer
+	eventConsumer := worker.NewEventConsumer(log)
+	eventConsumer.RegisterHandler("task.created", func(ctx context.Context, evt event.Event) error {
+		log.Info("background handler: task created", "taskID", evt.AggregateID())
+		return nil
+	})
+	eventConsumer.RegisterHandler("task.updated", func(ctx context.Context, evt event.Event) error {
+		log.Info("background handler: task updated", "taskID", evt.AggregateID())
+		return nil
+	})
+	eventConsumer.RegisterHandler("user.created", func(ctx context.Context, evt event.Event) error {
+		log.Info("background handler: user created", "userID", evt.AggregateID())
+		return nil
+	})
+	eventConsumer.RegisterHandler("user.logged_in", func(ctx context.Context, evt event.Event) error {
+		log.Info("background handler: user logged in", "userID", evt.AggregateID())
+		return nil
+	})
+
+	if eventSubscriber != nil {
+		if err := eventConsumer.Start(ctx, eventSubscriber, []string{output.TopicTaskEvents, output.TopicUserEvents}); err != nil {
+			log.Warn("failed to start event consumer", "error", err)
+		} else {
+			log.Info("background event consumer started")
+			defer eventConsumer.Stop()
+		}
+	}
 
 	// Initialize auth middleware
 	authMiddleware := auth.NewMiddleware(authService, userService, authorizer, aclChecker)

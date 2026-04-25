@@ -22,11 +22,11 @@ This file is the single operational view for implementation progress, current pr
 - [x] Align gRPC startup with `cfg.GRPC.Port` instead of a fixed port.
 - [x] Register real gRPC services for task, user, auth, and label operations.
 - [x] Add CI, delivery automation, and release workflow support.
+- [x] Add background consumers or subscribers for published domain events.
 
 ## Next
 
 - [ ] Expose GraphQL over HTTP using the existing schema.
-- [ ] Add background consumers or subscribers for published domain events.
 - [ ] Expand Redis usage into token revocation, session invalidation, or read caching.
 
 ## Later
@@ -48,4 +48,4 @@ This file is the single operational view for implementation progress, current pr
 
 - Working today: REST API, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
 - Partial today: GraphQL schema and file storage adapters without user-facing workflows.
-- Main gap today: GraphQL HTTP endpoint, background event consumers, expanded Redis usage, and attachment workflows beyond the core REST and gRPC surfaces.
+- Main gap today: GraphQL HTTP endpoint, expanded Redis usage, and attachment workflows beyond the core REST and gRPC surfaces.

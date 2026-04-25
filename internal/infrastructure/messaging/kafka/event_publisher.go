@@ -258,6 +258,7 @@ func deserializeEvent(eventType string, data []byte) (event.Event, error) {
 	var err error
 
 	switch eventType {
+	// Task events
 	case "task.created":
 		var e event.TaskCreated
 		err = json.Unmarshal(data, &e)
@@ -270,8 +271,65 @@ func deserializeEvent(eventType string, data []byte) (event.Event, error) {
 		var e event.TaskDeleted
 		err = json.Unmarshal(data, &e)
 		evt = &e
+	case "task.assigned":
+		var e event.TaskAssigned
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "task.unassigned":
+		var e event.TaskUnassigned
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "task.completed":
+		var e event.TaskCompleted
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "task.archived":
+		var e event.TaskArchived
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "task.status_changed":
+		var e event.TaskStatusChanged
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "task.label_added":
+		var e event.TaskLabelAdded
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "task.label_removed":
+		var e event.TaskLabelRemoved
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	// User events
 	case "user.created":
 		var e event.UserCreated
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "user.updated":
+		var e event.UserUpdated
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "user.deleted":
+		var e event.UserDeleted
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "user.role_assigned":
+		var e event.UserRoleAssigned
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "user.role_removed":
+		var e event.UserRoleRemoved
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "user.password_changed":
+		var e event.UserPasswordChanged
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "user.logged_in":
+		var e event.UserLoggedIn
+		err = json.Unmarshal(data, &e)
+		evt = &e
+	case "user.logged_out":
+		var e event.UserLoggedOut
 		err = json.Unmarshal(data, &e)
 		evt = &e
 	default:
