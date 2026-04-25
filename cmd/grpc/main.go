@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	authUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
+	labelUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/label"
 	taskUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
@@ -102,26 +103,13 @@ func main() {
 	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, tm, v, log)
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, tokenService, v, log)
-
-	_ = taskService
-	_ = userService
-	_ = authService
-
-	// gRPC services would be registered here
-	// For now, it just starts the server as in the original main.go
-	// However, we need the actual service implementations to register them.
-	// Looking at cmd/server/main.go, it only calls grpcTransport.NewServer(log)
-	// and Start(ctx, grpcAddr).
+	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
 
 	// =====================
 	// Initialize gRPC Server
 	// =====================
 	grpcServer := grpcTransport.NewServer(log)
-
-	// Register services if they were defined and exposed
-	// Since I don't see RegisterTaskServiceServer etc. being called in main.go,
-	// I assume they are registered inside grpcTransport.NewServer or should be done here.
-	// Based on my previous grep, RegisterTaskServiceServer was not found in internal/transport/grpc.
+	grpcTransport.RegisterApplicationServices(grpcServer.GRPCServer(), taskService, userService, authService, labelService)
 
 	grpcAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.GRPC.Port)
 	if err := grpcServer.Start(ctx, grpcAddr); err != nil {

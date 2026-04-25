@@ -11,25 +11,46 @@ import "google/protobuf/empty.proto";
 service TaskService {
   // Create a new task
   rpc CreateTask(CreateTaskRequest) returns (Task);
-  
+
   // Get a task by ID
   rpc GetTask(GetTaskRequest) returns (Task);
-  
+
   // List tasks with filtering and pagination
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
-  
+
   // Update an existing task
   rpc UpdateTask(UpdateTaskRequest) returns (Task);
-  
+
   // Delete a task
   rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
-  
+
   // Assign a task to a user
   rpc AssignTask(AssignTaskRequest) returns (Task);
-  
+
+  // Unassign a task
+  rpc UnassignTask(GetTaskRequest) returns (Task);
+
   // Change task status
   rpc ChangeTaskStatus(ChangeTaskStatusRequest) returns (Task);
-  
+
+  // Complete a task
+  rpc CompleteTask(GetTaskRequest) returns (Task);
+
+  // Archive a task
+  rpc ArchiveTask(GetTaskRequest) returns (Task);
+
+  // Add a label to a task
+  rpc AddLabel(AddLabelRequest) returns (Task);
+
+  // Remove a label from a task
+  rpc RemoveLabel(RemoveLabelRequest) returns (Task);
+
+  // Search tasks
+  rpc SearchTasks(SearchTasksRequest) returns (ListTasksResponse);
+
+  // Get overdue tasks
+  rpc GetOverdueTasks(ListOverdueTasksRequest) returns (ListTasksResponse);
+
   // Stream task updates (server streaming)
   rpc StreamTaskUpdates(StreamTaskUpdatesRequest) returns (stream TaskEvent);
 }
@@ -38,33 +59,60 @@ service TaskService {
 service UserService {
   // Get current user
   rpc GetMe(google.protobuf.Empty) returns (User);
-  
+
   // Get user by ID
   rpc GetUser(GetUserRequest) returns (User);
-  
+
   // List users
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
-  
-  // Create a new user
-  rpc CreateUser(CreateUserRequest) returns (User);
-  
+
   // Update user
   rpc UpdateUser(UpdateUserRequest) returns (User);
-  
+
   // Delete user
   rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+
+  // Assign a role to a user
+  rpc AssignRole(AssignRoleRequest) returns (User);
+
+  // Remove a role from a user
+  rpc RemoveRole(RemoveRoleRequest) returns (User);
 }
 
 // AuthService provides authentication methods.
 service AuthService {
   // Login with credentials
   rpc Login(LoginRequest) returns (AuthResponse);
-  
+
+  // Register a new user
+  rpc Register(CreateUserRequest) returns (AuthResponse);
+
   // Refresh access token
   rpc RefreshToken(RefreshTokenRequest) returns (AuthResponse);
-  
+
   // Logout
   rpc Logout(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Change password
+  rpc ChangePassword(ChangePasswordRequest) returns (google.protobuf.Empty);
+}
+
+// LabelService provides label management methods.
+service LabelService {
+  // Create a new label
+  rpc CreateLabel(CreateLabelRequest) returns (Label);
+
+  // Get a label by ID
+  rpc GetLabel(GetLabelRequest) returns (Label);
+
+  // List all labels
+  rpc ListLabels(google.protobuf.Empty) returns (ListLabelsResponse);
+
+  // Update a label
+  rpc UpdateLabel(UpdateLabelRequest) returns (Label);
+
+  // Delete a label
+  rpc DeleteLabel(DeleteLabelRequest) returns (google.protobuf.Empty);
 }
 
 // ========== Messages ==========
@@ -196,6 +244,25 @@ message ChangeTaskStatusRequest {
   TaskStatus status = 2;
 }
 
+message AddLabelRequest {
+  string task_id = 1;
+  string label_id = 2;
+}
+
+message RemoveLabelRequest {
+  string task_id = 1;
+  string label_id = 2;
+}
+
+message SearchTasksRequest {
+  string query = 1;
+  Pagination pagination = 2;
+}
+
+message ListOverdueTasksRequest {
+  Pagination pagination = 1;
+}
+
 message StreamTaskUpdatesRequest {
   // Optional filter for specific tasks
   repeated string task_ids = 1;
@@ -259,6 +326,16 @@ message DeleteUserRequest {
   string id = 1;
 }
 
+message AssignRoleRequest {
+  string user_id = 1;
+  string role_id = 2;
+}
+
+message RemoveRoleRequest {
+  string user_id = 1;
+  string role_id = 2;
+}
+
 message LoginRequest {
   string email = 1;
   string password = 2;
@@ -266,4 +343,32 @@ message LoginRequest {
 
 message RefreshTokenRequest {
   string refresh_token = 1;
+}
+
+message ChangePasswordRequest {
+  string old_password = 1;
+  string new_password = 2;
+}
+
+message GetLabelRequest {
+  string id = 1;
+}
+
+message ListLabelsResponse {
+  repeated Label labels = 1;
+}
+
+message CreateLabelRequest {
+  string name = 1;
+  string color = 2;
+}
+
+message UpdateLabelRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string color = 3;
+}
+
+message DeleteLabelRequest {
+  string id = 1;
 }
