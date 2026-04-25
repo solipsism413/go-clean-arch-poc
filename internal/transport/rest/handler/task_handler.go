@@ -207,6 +207,21 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // Assign handles POST /tasks/{id}/assign
+// @Summary Assign a task
+// @Description Assign a task to a user
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Param body body object{assigneeId=string} true "Assignee payload"
+// @Success 200 {object} presenter.Response{data=dto.TaskOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/assign [post]
 func (h *TaskHandler) Assign(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -236,6 +251,20 @@ func (h *TaskHandler) Assign(w http.ResponseWriter, r *http.Request) {
 }
 
 // Unassign handles POST /tasks/{id}/unassign
+// @Summary Unassign a task
+// @Description Remove the current assignee from a task
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.TaskOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/unassign [post]
 func (h *TaskHandler) Unassign(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -257,6 +286,20 @@ func (h *TaskHandler) Unassign(w http.ResponseWriter, r *http.Request) {
 }
 
 // Complete handles POST /tasks/{id}/complete
+// @Summary Complete a task
+// @Description Mark a task as done
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.TaskOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/complete [post]
 func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -278,6 +321,20 @@ func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
 }
 
 // Archive handles POST /tasks/{id}/archive
+// @Summary Archive a task
+// @Description Archive a task so it no longer appears as active work
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.TaskOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/archive [post]
 func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -299,6 +356,21 @@ func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
 }
 
 // ChangeStatus handles POST /tasks/{id}/status
+// @Summary Change task status
+// @Description Change a task status explicitly
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Param body body object{status=string} true "Status payload"
+// @Success 200 {object} presenter.Response{data=dto.TaskOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/status [post]
 func (h *TaskHandler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -328,6 +400,21 @@ func (h *TaskHandler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // AddLabel handles POST /tasks/{id}/labels/{labelId}
+// @Summary Add label to task
+// @Description Attach an existing label to a task
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Param labelId path string true "Label ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.TaskOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/labels/{labelId} [post]
 func (h *TaskHandler) AddLabel(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -355,6 +442,21 @@ func (h *TaskHandler) AddLabel(w http.ResponseWriter, r *http.Request) {
 }
 
 // RemoveLabel handles DELETE /tasks/{id}/labels/{labelId}
+// @Summary Remove label from task
+// @Description Detach a label from a task
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Param labelId path string true "Label ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.TaskOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/labels/{labelId} [delete]
 func (h *TaskHandler) RemoveLabel(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {

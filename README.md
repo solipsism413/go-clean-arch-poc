@@ -1,32 +1,40 @@
 # Go Clean Architecture PoC
 
-A Task Management Application built with Hexagonal (Ports & Adapters) Architecture in Go.
+A task management application built with Hexagonal (Ports & Adapters) Architecture in Go.
 
-## 🏗️ Architecture
+## Current Status
 
-This project follows the **Hexagonal Architecture** (also known as Ports & Adapters) pattern, which aims to create a loosely coupled application by isolating the core business logic from external concerns like databases, UI, and external services.
+- Active HTTP interfaces: REST API, WebSocket, SSE, and Socket.IO.
+- Swagger documents the REST API at `/swagger/`.
+- GraphQL currently exists as schema only in `internal/transport/graphql/schema.graphqls` and is not exposed by the server.
+- gRPC currently starts a server shell, but no application services are registered yet.
+- `POST /api/v1/auth/register` is routed, but currently returns `501 Not Implemented`.
+
+## Architecture
+
+This project follows **Hexagonal Architecture** (Ports & Adapters) to keep business logic isolated from transport and infrastructure concerns.
 
 ### Core Principles
 
-- **Domain Centric**: The business logic is at the center of the application.
-- **Dependency Rule**: Dependencies point inwards. The core (Domain and Application layers) doesn't know anything about the outer layers (Infrastructure and Transport).
-- **Independence**: The application is independent of frameworks, UI, databases, or any external agency.
-- **Testability**: The core logic can be tested without any external components.
+- **Domain centric**: business rules live in the domain and application layers.
+- **Dependency rule**: dependencies point inward.
+- **Framework independence**: core logic does not depend on HTTP, databases, or brokers.
+- **Testability**: domain and use case logic can be tested in isolation.
 
 ### Layers
 
-1.  **Domain Layer (Core)**: Contains entities, value objects, domain events, and domain errors. It encapsulates the fundamental business rules.
-2.  **Application Layer**: Implements use cases (Input Ports) and defines interfaces for external systems (Output Ports). It coordinates the flow of data to and from the domain layer.
-3.  **Transport Layer**: Handles incoming requests from various sources (REST, GraphQL, gRPC, WebSocket) and translates them into application use case calls.
-4.  **Infrastructure Layer**: Contains concrete implementations of the output ports (e.g., PostgreSQL repository, Kafka publisher, Redis cache).
+1. **Domain Layer**: entities, value objects, domain events, and domain errors.
+2. **Application Layer**: use cases, DTOs, validation, and ports.
+3. **Transport Layer**: REST, WebSocket, SSE, and Socket.IO adapters.
+4. **Infrastructure Layer**: PostgreSQL, Redis, Kafka, S3/MinIO, and observability support.
 
 ```mermaid
 graph TD
     subgraph Transport_Layer [Transport Layer]
         REST[REST API]
-        GraphQL[GraphQL]
-        gRPC[gRPC]
         WS[WebSocket]
+        SSE[SSE]
+        SIO[Socket.IO]
     end
 
     subgraph Application_Layer [Application Layer]
@@ -47,26 +55,26 @@ graph TD
         Storage[S3/MinIO]
     end
 
-    REST & GraphQL & gRPC & WS --> UC
+    REST & WS & SSE & SIO --> UC
     UC --> Entities & VO & Events
     UC --> Ports
     Ports --> DB & Cache & Messaging & Storage
 ```
 
-## 🛠️ Infrastructure
+## Infrastructure
 
-The application relies on several infrastructure components to provide robust features:
+The repository includes these infrastructure integrations and tooling:
 
-- **PostgreSQL**: Primary relational database for persistent storage of users, tasks, roles, and permissions.
-- **Redis**: High-performance cache for session management and frequently accessed data.
-- **Kafka**: Distributed event streaming platform for handling domain events and asynchronous communication.
-- **MinIO / S3**: Object storage for handling file uploads and attachments.
-- **OpenTelemetry (OTel)**: Provides observability through distributed tracing, metrics, and logging.
-- **GQLGen**: Used for generating GraphQL code from schema.
-- **SQLC**: Generates type-safe Go code from SQL queries.
-- **Viper**: Manages application configuration from environment variables and files.
+- **PostgreSQL**: primary relational database.
+- **Redis**: cache and token/session support.
+- **Kafka**: event publishing.
+- **MinIO / S3**: object storage.
+- **OpenTelemetry (OTel)**: configuration and support package are present.
+- **SQLC**: generates type-safe Go code from SQL queries.
+- **GQLGen**: schema and generator config are present for future GraphQL work.
+- **Viper**: configuration management from environment variables and optional config files.
 
-## 📊 Diagrams
+## Diagrams
 
 ### Use Case Diagram
 
@@ -76,18 +84,21 @@ graph TD
     Admin((Admin))
 
     subgraph Auth
-        User --> Register([Register])
         User --> Login([Login])
+        User --> Refresh([Refresh Token])
         User --> Logout([Logout])
+        User --> ChangePassword([Change Password])
     end
 
     subgraph Task_Management [Task Management]
         User --> CreateTask([Create Task])
         User --> UpdateTask([Update Task])
         User --> ViewTasks([View Tasks])
+        User --> SearchTasks([Search Tasks])
         User --> AssignTask([Assign Task])
         User --> CompleteTask([Complete Task])
         User --> ArchiveTask([Archive Task])
+        User --> ManageLabels([Manage Labels])
     end
 
     subgraph Administration
@@ -157,7 +168,7 @@ erDiagram
 
 ````
 
-### Request Flow (Sequence Diagram)
+### Request Flow
 
 Example: **Create Task**
 
@@ -174,56 +185,26 @@ sequenceDiagram
     participant Kafka
 
     Client->>REST: POST /tasks (JSON)
-    REST->>DTO: Parse & Validate
+    REST->>DTO: Parse and validate
     DTO-->>REST: Valid DTO
     REST->>UC: Execute(ctx, dto)
-    UC->>Domain: NewTask(title, desc, priority, creatorID)
+    UC->>Domain: NewTask(...)
     Domain-->>UC: Task Entity
     UC->>Repo: Save(ctx, task)
     Repo->>DB: INSERT INTO tasks ...
     DB-->>Repo: Success
     UC->>Event: Publish(TaskCreatedEvent)
-    Event->>Kafka: Produce Message
+    Event->>Kafka: Produce message if configured
     UC-->>REST: Task DTO
     REST-->>Client: 201 Created (JSON)
 ```
 
-### Data Processing Flow
-
-```mermaid
-graph LR
-    subgraph Input_Phase [Input]
-        JSON[External JSON/GQL] --> DTO[Application DTO]
-    end
-
-    subgraph Business_Phase [Business Logic]
-        DTO --> UseCase[UseCase]
-        UseCase --> Entity[Domain Entity]
-    end
-
-    subgraph Persistence_Phase [Persistence]
-        Entity --> SQLC[SQLC/Repository]
-        SQLC --> SQL[SQL Query]
-        SQL --> DB[(PostgreSQL)]
-    end
-
-    subgraph Output_Phase [Output]
-        DB --> SQLC
-        SQLC --> Entity
-        Entity --> DTO
-        DTO --> JSON
-    end
-
-    style UseCase fill:#f9f,stroke:#333,stroke-width:2px
-    style Entity fill:#bbf,stroke:#333,stroke-width:2px
-```
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - Go 1.26.2+
-- Docker & Docker Compose
+- Docker and Docker Compose
 
 ### Running with Docker
 
@@ -248,77 +229,155 @@ docker compose --profile watch up --watch
 make docker-watch
 ```
 
-`docker-compose.yml` is now the single source for both modes using Compose `profiles`. `app` runs under the `prod` profile with the production image/runtime, while `app-watch` runs under the `watch` profile with `air` and `develop.watch`. Changes under `cmd/`, `internal/`, `pkg/`, `docs/`, and `migrations/` are synced into the container, while changes to `go.mod`, `go.sum`, `.air.toml`, `Dockerfile`, `sqlc.yaml`, and `gqlgen.yml` trigger an image rebuild.
+`docker-compose.yml` is the source for both modes using Compose `profiles`. `app` runs under `prod`, while `app-watch` runs under `watch` with `air` and `develop.watch`.
 
 ### Running Locally
 
 ```bash
 # Start infrastructure services
-docker compose up -d postgres redis kafka minio
+docker compose up -d postgres redis kafka minio minio-init
 
 # Run migrations
 docker compose run --rm migrate
 
-# Run the application
+# Run the HTTP server
 go run ./cmd/server
+
+# Optional: run the gRPC server shell
+go run ./cmd/grpc
 ```
 
-## 📁 Project Structure
+## Available Endpoints
 
-```
+### REST
+
+- Base URL: `http://localhost:8080/api/v1`
+- Swagger UI: `http://localhost:8080/swagger/`
+- Health check: `GET http://localhost:8080/health`
+
+Auth:
+- `POST /auth/login`
+- `POST /auth/register` currently returns `501 Not Implemented`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `POST /auth/change-password`
+
+Tasks:
+- `GET /tasks`
+- `GET /tasks/search`
+- `GET /tasks/overdue`
+- `POST /tasks`
+- `GET /tasks/{id}`
+- `PUT /tasks/{id}`
+- `DELETE /tasks/{id}`
+- `POST /tasks/{id}/assign`
+- `POST /tasks/{id}/unassign`
+- `POST /tasks/{id}/complete`
+- `POST /tasks/{id}/archive`
+- `POST /tasks/{id}/status`
+- `POST /tasks/{id}/labels/{labelId}`
+- `DELETE /tasks/{id}/labels/{labelId}`
+
+Users:
+- `GET /users`
+- `GET /users/me`
+- `GET /users/{id}`
+- `PUT /users/{id}`
+- `DELETE /users/{id}`
+- `POST /users/{id}/roles/{roleId}`
+- `DELETE /users/{id}/roles/{roleId}`
+
+### Realtime
+
+- WebSocket: `GET /ws`
+- SSE: `GET /events`
+- Socket.IO: `GET /socket.io/`
+
+### Not Exposed Yet
+
+- GraphQL schema is stored in `internal/transport/graphql/schema.graphqls`, but no GraphQL HTTP endpoint is registered.
+- gRPC proto definitions exist in `internal/transport/grpc/proto/task.proto`, but the running gRPC server does not register `TaskService`, `UserService`, or `AuthService` implementations yet.
+
+## Project Structure
+
+```text
 ├── cmd/
-│   └── server/              # Application entrypoint
+│   ├── server/              # HTTP server entrypoint
+│   └── grpc/                # gRPC server entrypoint
 ├── internal/
-│   ├── domain/              # Domain Layer (Core Business Logic)
-│   │   ├── entity/          # Domain entities
-│   │   ├── valueobject/     # Value objects
-│   │   ├── event/           # Domain events
-│   │   └── error/           # Domain errors
-│   ├── application/         # Application Layer
-│   │   ├── port/
-│   │   │   ├── input/       # Input ports (use case interfaces)
-│   │   │   └── output/      # Output ports (repository interfaces)
-│   │   ├── usecase/         # Use case implementations
-│   │   ├── dto/             # Data transfer objects
-│   │   └── validation/      # Input validation
-│   ├── infrastructure/      # Infrastructure Layer
-│   │   ├── database/        # Database implementations
-│   │   ├── cache/           # Cache implementations
-│   │   ├── messaging/       # Message broker implementations
-│   │   ├── storage/         # File storage implementations
-│   │   └── observability/   # Logging, tracing, metrics
-│   └── transport/           # Transport Layer
+│   ├── domain/              # Domain layer
+│   │   ├── entity/
+│   │   ├── valueobject/
+│   │   ├── event/
+│   │   └── error/
+│   ├── application/         # Use cases, DTOs, validation, and ports
+│   ├── infrastructure/      # Database, cache, messaging, storage, logging
+│   └── transport/
 │       ├── rest/            # REST API handlers
-│       ├── graphql/         # GraphQL resolvers
-│       └── grpc/            # gRPC services
+│       ├── grpc/            # gRPC server primitives and proto files
+│       ├── graphql/         # GraphQL schema placeholder
+│       ├── socketio/        # Socket.IO transport
+│       ├── sse/             # Server-Sent Events transport
+│       └── websocket/       # WebSocket transport
+├── docs/                    # Generated Swagger docs
 ├── migrations/              # Database migrations
-├── pkg/                     # Shared packages
-│   └── config/              # Configuration
-├── Dockerfile
+├── pkg/
+│   └── config/              # Configuration loader
 ├── docker-compose.yml
-└── sqlc.yaml                # SQLC configuration
+├── Dockerfile
+├── Makefile
+└── sqlc.yaml
 ```
 
-## 🔧 Configuration
+## Configuration
 
-Configuration is done via environment variables:
+Configuration can be provided through environment variables or an optional `config.yaml`.
 
-| Variable        | Description        | Default          |
-| --------------- | ------------------ | ---------------- |
-| `SERVER_HOST`   | Server host        | `0.0.0.0`        |
-| `SERVER_PORT`   | Server port        | `8080`           |
-| `DB_HOST`       | PostgreSQL host    | `localhost`      |
-| `DB_PORT`       | PostgreSQL port    | `5432`           |
-| `DB_USER`       | Database user      | `postgres`       |
-| `DB_PASSWORD`   | Database password  | `postgres`       |
-| `DB_NAME`       | Database name      | `taskmanager`    |
-| `REDIS_HOST`    | Redis host         | `localhost`      |
-| `REDIS_PORT`    | Redis port         | `6379`           |
-| `KAFKA_BROKERS` | Kafka brokers      | `localhost:9092` |
-| `S3_ENDPOINT`   | S3/MinIO endpoint  | -                |
-| `JWT_SECRET`    | JWT signing secret | -                |
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SERVER_HOST` | HTTP server host | `0.0.0.0` |
+| `SERVER_PORT` | HTTP server port | `8080` |
+| `SERVER_READ_TIMEOUT` | HTTP read timeout | `30s` |
+| `SERVER_WRITE_TIMEOUT` | HTTP write timeout | `30s` |
+| `SERVER_IDLE_TIMEOUT` | HTTP idle timeout | `120s` |
+| `GRPC_PORT` | gRPC server port | `9090` |
+| `DB_HOST` | PostgreSQL host | `localhost` |
+| `DB_PORT` | PostgreSQL port | `5433` |
+| `DB_USER` | PostgreSQL user | `taskmanager` |
+| `DB_PASSWORD` | PostgreSQL password | `taskmanager_secret` |
+| `DB_NAME` | PostgreSQL database | `taskmanager` |
+| `DB_SSLMODE` | PostgreSQL SSL mode | `disable` |
+| `DB_MAX_CONNS` | PostgreSQL max connections | `25` |
+| `DB_MIN_CONNS` | PostgreSQL min connections | `5` |
+| `DB_MAX_CONN_LIFETIME` | PostgreSQL max conn lifetime | `1h` |
+| `DB_MAX_CONN_IDLE_TIME` | PostgreSQL max idle conn time | `30m` |
+| `REDIS_HOST` | Redis host | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `REDIS_PASSWORD` | Redis password | `redis_secret` |
+| `REDIS_DB` | Redis DB index | `0` |
+| `REDIS_POOL_SIZE` | Redis pool size | `10` |
+| `REDIS_MIN_IDLE_CONNS` | Redis min idle conns | `5` |
+| `KAFKA_BROKERS` | Kafka brokers | `localhost:9092` |
+| `KAFKA_CONSUMER_GROUP` | Kafka consumer group | `taskmanager` |
+| `KAFKA_AUTO_OFFSET_RESET` | Kafka offset reset policy | `earliest` |
+| `S3_ENDPOINT` | S3/MinIO endpoint | `http://localhost:9000` |
+| `S3_REGION` | S3 region | `us-east-1` |
+| `S3_ACCESS_KEY_ID` | S3 access key | `minioadmin` |
+| `S3_SECRET_ACCESS_KEY` | S3 secret key | `minioadmin123` |
+| `S3_BUCKET` | S3 bucket name | `taskmanager` |
+| `S3_USE_PATH_STYLE` | Force path-style S3 addressing | `true` |
+| `JWT_SECRET` | JWT signing secret | `your-super-secret-jwt-key-change-in-production` |
+| `JWT_ACCESS_TOKEN_TTL` | Access token TTL | `15m` |
+| `JWT_REFRESH_TOKEN_TTL` | Refresh token TTL | `168h` |
+| `JWT_ISSUER` | JWT issuer | `taskmanager` |
+| `OTEL_SERVICE_NAME` | OTel service name | `taskmanager` |
+| `OTEL_SERVICE_VERSION` | OTel service version | `1.0.0` |
+| `OTEL_EXPORTER_ENDPOINT` | OTel exporter endpoint | `localhost:4317` |
+| `OTEL_ENABLED` | Enable OTel exporter | `false` |
+| `LOG_LEVEL` | Logger level | `info` |
+| `LOG_FORMAT` | Logger format | `json` |
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run all tests
@@ -331,13 +390,15 @@ go test -cover ./...
 go test -race ./...
 ```
 
-## 📚 API Documentation
+## API Documentation
 
-Once the server is running, access the Swagger documentation at:
+Once the HTTP server is running, access Swagger at:
 
 - http://localhost:8080/swagger/
 
-## 🛠️ Development
+Swagger currently covers the REST API only.
+
+## Development
 
 ### Hot Reload with Air
 
@@ -366,7 +427,7 @@ sqlc generate
 go install github.com/swaggo/swag/cmd/swag@latest
 
 # Generate Swagger docs
-swag init -g cmd/server/main.go
+swag init -g cmd/server/main.go -o docs
 ```
 
 ### Database Migrations
@@ -379,12 +440,12 @@ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@lat
 migrate create -ext sql -dir migrations -seq migration_name
 
 # Run migrations up
-migrate -database "postgres://user:pass@localhost:5433/taskmanager?sslmode=disable" -path migrations up
+migrate -database "postgres://taskmanager:taskmanager_secret@localhost:5433/taskmanager?sslmode=disable" -path migrations up
 
 # Run migrations down
-migrate -database "postgres://user:pass@localhost:5433/taskmanager?sslmode=disable" -path migrations down
+migrate -database "postgres://taskmanager:taskmanager_secret@localhost:5433/taskmanager?sslmode=disable" -path migrations down
 ```
 
-## 📝 License
+## License
 
 MIT License

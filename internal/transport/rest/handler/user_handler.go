@@ -32,6 +32,21 @@ func NewUserHandler(userService input.UserService, aclChecker *acl.Checker, logg
 }
 
 // List handles GET /users
+// @Summary List users
+// @Description Get a paginated list of users with optional search
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param pageSize query int false "Items per page" default(20)
+// @Param search query string false "Search by name or email"
+// @Success 200 {object} presenter.Response{data=dto.UserListOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /users [get]
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	filter := dto.UserFilter{
 		Search: r.URL.Query().Get("search"),
@@ -49,6 +64,20 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get handles GET /users/{id}
+// @Summary Get user by ID
+// @Description Get detailed information about a specific user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.UserOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /users/{id} [get]
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -70,6 +99,16 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Me handles GET /users/me
+// @Summary Get current user
+// @Description Get the authenticated user's profile
+// @Tags users
+// @Accept json
+// @Produce json
+// @Success 200 {object} presenter.Response{data=dto.UserOutput}
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /users/me [get]
 func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -87,6 +126,21 @@ func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update handles PUT /users/{id}
+// @Summary Update user
+// @Description Update an existing user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID" format(uuid)
+// @Param user body dto.UpdateUserInput true "User updates"
+// @Success 200 {object} presenter.Response{data=dto.UserOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /users/{id} [put]
 func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -114,6 +168,20 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete handles DELETE /users/{id}
+// @Summary Delete user
+// @Description Delete a user by ID
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID" format(uuid)
+// @Success 204 "No Content"
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /users/{id} [delete]
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -134,6 +202,21 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // AssignRole handles POST /users/{id}/roles/{roleId}
+// @Summary Assign role to user
+// @Description Attach an existing role to a user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID" format(uuid)
+// @Param roleId path string true "Role ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.UserOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /users/{id}/roles/{roleId} [post]
 func (h *UserHandler) AssignRole(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -157,6 +240,21 @@ func (h *UserHandler) AssignRole(w http.ResponseWriter, r *http.Request) {
 }
 
 // RemoveRole handles DELETE /users/{id}/roles/{roleId}
+// @Summary Remove role from user
+// @Description Detach a role from a user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "User ID" format(uuid)
+// @Param roleId path string true "Role ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.UserOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /users/{id}/roles/{roleId} [delete]
 func (h *UserHandler) RemoveRole(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {

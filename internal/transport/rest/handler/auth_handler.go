@@ -54,15 +54,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // Register handles POST /auth/register
-// @Summary Register
-// @Description Create a new user account
+// @Summary Register user
+// @Description Registration route is reserved but not implemented yet
 // @Tags auth
 // @Accept json
 // @Produce json
 // @Param user body dto.CreateUserInput true "User details"
-// @Success 201 {object} presenter.Response{data=dto.UserOutput}
 // @Failure 400 {object} presenter.ErrorResponse
-// @Failure 409 {object} presenter.ErrorResponse
+// @Failure 501 {object} presenter.ErrorResponse
 // @Failure 500 {object} presenter.ErrorResponse
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
