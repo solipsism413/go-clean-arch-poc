@@ -1,6 +1,6 @@
 # Task Manager - Makefile
 
-.PHONY: all build run test clean docker-up docker-watch docker-down setup-infra migrate generate lint fmt help
+.PHONY: all build run test clean docker-up docker-watch docker-down setup-infra migrate generate lint fmt help seed-db
 
 # Variables
 APP_NAME := task-manager
@@ -36,6 +36,11 @@ run-api:
 run-grpc:
 	@echo "Running $(GRPC_NAME)..."
 	go run $(GRPC_MAIN)
+
+# Seed development database data
+seed-db:
+	@echo "Seeding database..."
+	go run ./cmd/seed
 
 # Run with hot reload
 dev:

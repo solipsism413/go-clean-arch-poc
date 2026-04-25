@@ -35,6 +35,7 @@ docker compose --profile prod up -d
 
 ```bash
 make setup-infra
+make seed-db
 go run ./cmd/server
 ```
 
@@ -58,10 +59,13 @@ go run ./cmd/grpc
 ```bash
 make run-api
 make run-grpc
+make seed-db
 make test
 make generate
 make docker-watch
 ```
+
+Seeded development users are created with password `password123`.
 
 ## Notes
 
