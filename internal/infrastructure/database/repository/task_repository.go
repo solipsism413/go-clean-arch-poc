@@ -16,8 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Ensure TaskRepository implements the output.TaskRepository interface.
+// Ensure TaskRepository implements the output ports.
 var _ output.TaskRepository = (*TaskRepository)(nil)
+var _ output.TaskAttachmentRepository = (*TaskRepository)(nil)
 
 // TaskRepository implements the task repository using PostgreSQL.
 type TaskRepository struct {
@@ -258,6 +259,98 @@ func (r *TaskRepository) FindOverdue(ctx context.Context, pagination output.Pagi
 		PageSize:   pagination.PageSize,
 		TotalPages: totalPages,
 	}, nil
+}
+
+// SaveAttachment creates a new task attachment record.
+func (r *TaskRepository) SaveAttachment(ctx context.Context, attachment *entity.TaskAttachment) error {
+	var contentType *string
+	if attachment.ContentType != "" {
+		contentType = &attachment.ContentType
+	}
+
+	var sizeBytes *int64
+	if attachment.SizeBytes > 0 {
+		sizeBytes = &attachment.SizeBytes
+	}
+
+	var uploadedBy pgtype.UUID
+	if attachment.UploadedBy != uuid.Nil {
+		uploadedBy = pgtype.UUID{Bytes: attachment.UploadedBy, Valid: true}
+	}
+
+	_, err := r.queries.CreateTaskAttachment(ctx, sqlc.CreateTaskAttachmentParams{
+		ID:          attachment.ID,
+		TaskID:      attachment.TaskID,
+		Filename:    attachment.Filename,
+		S3Key:       attachment.S3Key,
+		ContentType: contentType,
+		SizeBytes:   sizeBytes,
+		UploadedBy:  uploadedBy,
+		CreatedAt:   attachment.CreatedAt,
+	})
+	return err
+}
+
+// FindAttachmentByID retrieves an attachment by ID.
+func (r *TaskRepository) FindAttachmentByID(ctx context.Context, id uuid.UUID) (*entity.TaskAttachment, error) {
+	row, err := r.queries.GetTaskAttachment(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return sqlcAttachmentToEntity(row), nil
+}
+
+// FindAttachmentsByTaskID retrieves all attachments for a task.
+func (r *TaskRepository) FindAttachmentsByTaskID(ctx context.Context, taskID uuid.UUID) ([]*entity.TaskAttachment, error) {
+	rows, err := r.queries.ListTaskAttachments(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	attachments := make([]*entity.TaskAttachment, 0, len(rows))
+	for _, row := range rows {
+		attachments = append(attachments, sqlcAttachmentToEntity(row))
+	}
+	return attachments, nil
+}
+
+// DeleteAttachment removes an attachment by ID.
+func (r *TaskRepository) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
+	return r.queries.DeleteTaskAttachment(ctx, id)
+}
+
+// DeleteAttachmentsByTaskID removes all attachments for a task.
+func (r *TaskRepository) DeleteAttachmentsByTaskID(ctx context.Context, taskID uuid.UUID) error {
+	return r.queries.DeleteTaskAttachmentsByTask(ctx, taskID)
+}
+
+// sqlcAttachmentToEntity converts SQLC attachment model to domain entity.
+func sqlcAttachmentToEntity(row sqlc.TaskAttachment) *entity.TaskAttachment {
+	attachment := &entity.TaskAttachment{
+		ID:        row.ID,
+		TaskID:    row.TaskID,
+		Filename:  row.Filename,
+		S3Key:     row.S3Key,
+		CreatedAt: row.CreatedAt,
+	}
+
+	if row.ContentType != nil {
+		attachment.ContentType = *row.ContentType
+	}
+
+	if row.SizeBytes != nil {
+		attachment.SizeBytes = *row.SizeBytes
+	}
+
+	if row.UploadedBy.Valid {
+		uploadedBy := uuid.UUID(row.UploadedBy.Bytes)
+		attachment.UploadedBy = uploadedBy
+	}
+
+	return attachment
 }
 
 // sqlcTaskToEntity converts SQLC model to domain entity.

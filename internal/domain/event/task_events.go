@@ -240,3 +240,19 @@ func NewTaskLabelRemoved(taskID, labelID, removedBy uuid.UUID) TaskLabelRemoved 
 		RemovedBy: removedBy,
 	}
 }
+
+// TaskAttachmentCleanupRequested is emitted when attachment blob cleanup must be retried asynchronously.
+type TaskAttachmentCleanupRequested struct {
+	BaseEvent
+	AttachmentID uuid.UUID `json:"attachment_id"`
+	ObjectKey    string    `json:"object_key"`
+}
+
+// NewTaskAttachmentCleanupRequested creates a new cleanup request event.
+func NewTaskAttachmentCleanupRequested(taskID, attachmentID uuid.UUID, objectKey string) TaskAttachmentCleanupRequested {
+	return TaskAttachmentCleanupRequested{
+		BaseEvent:    NewBaseEvent("task.attachment_cleanup_requested", taskID),
+		AttachmentID: attachmentID,
+		ObjectKey:    objectKey,
+	}
+}

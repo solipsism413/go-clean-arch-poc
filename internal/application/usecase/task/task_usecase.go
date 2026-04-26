@@ -6,8 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
+	"path"
+	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,8 +40,10 @@ var _ input.TaskService = (*TaskUseCase)(nil)
 // TaskUseCase implements the task-related use cases.
 type TaskUseCase struct {
 	taskRepo       output.TaskRepository
+	attachmentRepo output.TaskAttachmentRepository
 	userRepo       output.UserRepository
 	labelRepo      output.LabelRepository
+	fileStorage    output.FileStorage
 	cache          output.CacheRepository
 	eventPublisher output.EventPublisher
 	tm             output.TransactionManager
@@ -48,8 +54,10 @@ type TaskUseCase struct {
 // NewTaskUseCase creates a new TaskUseCase.
 func NewTaskUseCase(
 	taskRepo output.TaskRepository,
+	attachmentRepo output.TaskAttachmentRepository,
 	userRepo output.UserRepository,
 	labelRepo output.LabelRepository,
+	fileStorage output.FileStorage,
 	cache output.CacheRepository,
 	eventPublisher output.EventPublisher,
 	tm output.TransactionManager,
@@ -58,8 +66,10 @@ func NewTaskUseCase(
 ) *TaskUseCase {
 	return &TaskUseCase{
 		taskRepo:       taskRepo,
+		attachmentRepo: attachmentRepo,
 		userRepo:       userRepo,
 		labelRepo:      labelRepo,
+		fileStorage:    fileStorage,
 		cache:          cache,
 		eventPublisher: eventPublisher,
 		tm:             tm,
@@ -131,9 +141,7 @@ func (uc *TaskUseCase) CreateTask(ctx context.Context, input dto.CreateTaskInput
 
 	// Publish event
 	evt := event.NewTaskCreated(task.ID, task.Title, task.Description, task.Priority, task.CreatorID)
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task created event", "taskId", task.ID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	uc.logger.Info("task created", "taskId", task.ID, "title", task.Title)
 
@@ -200,9 +208,7 @@ func (uc *TaskUseCase) UpdateTask(ctx context.Context, id uuid.UUID, input dto.U
 		priority, _ := valueobject.ParsePriority(*input.Priority)
 		evt = evt.WithPriority(priority)
 	}
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task updated event", "taskId", task.ID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	uc.logger.Info("task updated", "taskId", task.ID)
 
@@ -220,6 +226,16 @@ func (uc *TaskUseCase) DeleteTask(ctx context.Context, id uuid.UUID) error {
 		return domainerror.ErrTaskNotFound
 	}
 
+	attachments, err := uc.attachmentRepo.FindAttachmentsByTaskID(ctx, id)
+	if err != nil {
+		return err
+	}
+	for _, attachment := range attachments {
+		if err := uc.deleteAttachmentObject(ctx, id, attachment.ID, attachment.S3Key); err != nil {
+			return err
+		}
+	}
+
 	// Delete task
 	if err := uc.taskRepo.Delete(ctx, id); err != nil {
 		return err
@@ -230,9 +246,7 @@ func (uc *TaskUseCase) DeleteTask(ctx context.Context, id uuid.UUID) error {
 
 	// Publish event
 	evt := event.NewTaskDeleted(id, getCreatorIDFromContext(ctx))
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task deleted event", "taskId", id, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	uc.logger.Info("task deleted", "taskId", id)
 
@@ -390,9 +404,7 @@ func (uc *TaskUseCase) AssignTask(ctx context.Context, taskID, assigneeID uuid.U
 
 	// Publish event
 	evt := event.NewTaskAssigned(taskID, assigneeID, getCreatorIDFromContext(ctx))
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task assigned event", "taskId", taskID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	uc.logger.Info("task assigned", "taskId", taskID, "assigneeId", assigneeID)
 
@@ -426,9 +438,7 @@ func (uc *TaskUseCase) UnassignTask(ctx context.Context, taskID uuid.UUID) (*dto
 	// Publish event
 	if previousAssignee != nil {
 		evt := event.NewTaskUnassigned(taskID, *previousAssignee, getCreatorIDFromContext(ctx))
-		if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-			uc.logger.Error("failed to publish task unassigned event", "taskId", taskID, "error", err)
-		}
+		uc.publishTaskEvent(ctx, evt)
 	}
 
 	uc.logger.Info("task unassigned", "taskId", taskID)
@@ -470,9 +480,7 @@ func (uc *TaskUseCase) ChangeTaskStatus(ctx context.Context, taskID uuid.UUID, s
 
 	// Publish event
 	evt := event.NewTaskStatusChanged(taskID, oldStatus, newStatus, getCreatorIDFromContext(ctx))
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task status changed event", "taskId", taskID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	uc.logger.Info("task status changed", "taskId", taskID, "oldStatus", oldStatus, "newStatus", newStatus)
 
@@ -505,9 +513,7 @@ func (uc *TaskUseCase) CompleteTask(ctx context.Context, taskID uuid.UUID) (*dto
 
 	// Publish event
 	evt := event.NewTaskCompleted(taskID, getCreatorIDFromContext(ctx))
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task completed event", "taskId", taskID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	uc.logger.Info("task completed", "taskId", taskID)
 
@@ -540,9 +546,7 @@ func (uc *TaskUseCase) ArchiveTask(ctx context.Context, taskID uuid.UUID) (*dto.
 
 	// Publish event
 	evt := event.NewTaskArchived(taskID, getCreatorIDFromContext(ctx))
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task archived event", "taskId", taskID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	uc.logger.Info("task archived", "taskId", taskID)
 
@@ -582,9 +586,7 @@ func (uc *TaskUseCase) AddLabel(ctx context.Context, taskID, labelID uuid.UUID) 
 
 	// Publish event
 	evt := event.NewTaskLabelAdded(taskID, labelID, getCreatorIDFromContext(ctx))
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task label added event", "taskId", taskID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	return dto.TaskFromEntity(task), nil
 }
@@ -613,9 +615,7 @@ func (uc *TaskUseCase) RemoveLabel(ctx context.Context, taskID, labelID uuid.UUI
 
 	// Publish event
 	evt := event.NewTaskLabelRemoved(taskID, labelID, getCreatorIDFromContext(ctx))
-	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
-		uc.logger.Error("failed to publish task label removed event", "taskId", taskID, "error", err)
-	}
+	uc.publishTaskEvent(ctx, evt)
 
 	return dto.TaskFromEntity(task), nil
 }
@@ -678,6 +678,250 @@ func (uc *TaskUseCase) GetOverdueTasks(ctx context.Context, pagination dto.Pagin
 		PageSize:   paginatedResult.PageSize,
 		TotalPages: paginatedResult.TotalPages,
 	}, nil
+}
+
+// UploadTaskAttachment uploads a file attachment to a task.
+func (uc *TaskUseCase) UploadTaskAttachment(ctx context.Context, taskID uuid.UUID, filename, contentType string, reader io.Reader) (*dto.TaskAttachmentOutput, error) {
+	if err := uc.ensureFileStorageAvailable(); err != nil {
+		return nil, err
+	}
+
+	// Verify task exists
+	exists, err := uc.taskRepo.ExistsByID(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, domainerror.ErrTaskNotFound
+	}
+
+	// Sanitize filename to prevent path traversal in storage key
+	safeFilename := sanitizeAttachmentFilename(filename)
+	if safeFilename == "" || safeFilename == "." || safeFilename == "/" {
+		return nil, domainerror.NewDomainError(domainerror.CodeValidation, "invalid filename")
+	}
+
+	// Get uploader ID from context
+	uploadedBy := getCreatorIDFromContext(ctx)
+
+	// Build a unique S3 key so duplicate filenames do not overwrite each other.
+	keyBuilder := output.NewFileKeyBuilder("attachments")
+	storageName := uuid.NewString() + "-" + safeFilename
+	s3Key := keyBuilder.TaskAttachment(taskID.String(), storageName)
+
+	// Upload to S3/MinIO
+	storageMeta, err := uc.fileStorage.Upload(ctx, s3Key, reader, output.UploadOptions{
+		ContentType: contentType,
+		Metadata: map[string]string{
+			"task_id":     taskID.String(),
+			"uploaded_by": uploadedBy.String(),
+			"filename":    safeFilename,
+		},
+	})
+	if err != nil {
+		uc.logger.Error("failed to upload attachment to storage", "taskId", taskID, "error", err)
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	// Create attachment entity
+	attachment := entity.NewTaskAttachment(
+		taskID,
+		safeFilename,
+		storageMeta.Key,
+		contentType,
+		storageMeta.Size,
+		uploadedBy,
+	)
+
+	// Save attachment record
+	if err := uc.attachmentRepo.SaveAttachment(ctx, attachment); err != nil {
+		uc.logger.Error("failed to save attachment record", "taskId", taskID, "error", err)
+		// Attempt to clean up S3 object
+		_ = uc.fileStorage.Delete(ctx, storageMeta.Key)
+		return nil, fmt.Errorf("failed to save attachment: %w", err)
+	}
+
+	uc.logger.Info("task attachment uploaded", "taskId", taskID, "attachmentId", attachment.ID, "filename", safeFilename)
+
+	return &dto.TaskAttachmentOutput{
+		ID:          attachment.ID,
+		TaskID:      attachment.TaskID,
+		Filename:    attachment.Filename,
+		ContentType: attachment.ContentType,
+		SizeBytes:   attachment.SizeBytes,
+		UploadedBy:  attachment.UploadedBy,
+		CreatedAt:   attachment.CreatedAt,
+	}, nil
+}
+
+// DownloadTaskAttachment retrieves a file attachment by ID, verifying it belongs to the given task.
+func (uc *TaskUseCase) DownloadTaskAttachment(ctx context.Context, taskID, attachmentID uuid.UUID) (io.ReadCloser, *dto.TaskAttachmentOutput, error) {
+	if err := uc.ensureFileStorageAvailable(); err != nil {
+		return nil, nil, err
+	}
+
+	// Find attachment record
+	attachment, err := uc.attachmentRepo.FindAttachmentByID(ctx, attachmentID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if attachment == nil {
+		return nil, nil, domainerror.ErrAttachmentNotFound
+	}
+
+	// Verify attachment belongs to the requested task
+	if attachment.TaskID != taskID {
+		return nil, nil, domainerror.ErrAttachmentNotFound
+	}
+
+	// Download from S3/MinIO
+	reader, _, err := uc.fileStorage.Download(ctx, attachment.S3Key)
+	if err != nil {
+		uc.logger.Error("failed to download attachment from storage", "attachmentId", attachmentID, "error", err)
+		return nil, nil, fmt.Errorf("failed to download file: %w", err)
+	}
+
+	output := &dto.TaskAttachmentOutput{
+		ID:          attachment.ID,
+		TaskID:      attachment.TaskID,
+		Filename:    attachment.Filename,
+		ContentType: attachment.ContentType,
+		SizeBytes:   attachment.SizeBytes,
+		UploadedBy:  attachment.UploadedBy,
+		CreatedAt:   attachment.CreatedAt,
+	}
+
+	return reader, output, nil
+}
+
+// ListTaskAttachments lists all attachments for a task.
+func (uc *TaskUseCase) ListTaskAttachments(ctx context.Context, taskID uuid.UUID) (*dto.TaskAttachmentListOutput, error) {
+	// Verify task exists
+	exists, err := uc.taskRepo.ExistsByID(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, domainerror.ErrTaskNotFound
+	}
+
+	attachments, err := uc.attachmentRepo.FindAttachmentsByTaskID(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	outputs := make([]dto.TaskAttachmentOutput, 0, len(attachments))
+	for _, attachment := range attachments {
+		outputs = append(outputs, dto.TaskAttachmentOutput{
+			ID:          attachment.ID,
+			TaskID:      attachment.TaskID,
+			Filename:    attachment.Filename,
+			ContentType: attachment.ContentType,
+			SizeBytes:   attachment.SizeBytes,
+			UploadedBy:  attachment.UploadedBy,
+			CreatedAt:   attachment.CreatedAt,
+		})
+	}
+
+	return &dto.TaskAttachmentListOutput{Attachments: outputs}, nil
+}
+
+// DeleteTaskAttachment removes an attachment by ID, verifying it belongs to the given task.
+func (uc *TaskUseCase) DeleteTaskAttachment(ctx context.Context, taskID, attachmentID uuid.UUID) error {
+	// Find attachment record
+	attachment, err := uc.attachmentRepo.FindAttachmentByID(ctx, attachmentID)
+	if err != nil {
+		return err
+	}
+	if attachment == nil {
+		return domainerror.ErrAttachmentNotFound
+	}
+
+	// Verify attachment belongs to the requested task
+	if attachment.TaskID != taskID {
+		return domainerror.ErrAttachmentNotFound
+	}
+
+	if err := uc.deleteAttachmentObject(ctx, taskID, attachmentID, attachment.S3Key); err != nil {
+		return err
+	}
+
+	// Delete attachment record
+	if err := uc.attachmentRepo.DeleteAttachment(ctx, attachmentID); err != nil {
+		return err
+	}
+
+	uc.logger.Info("task attachment deleted", "attachmentId", attachmentID)
+
+	return nil
+}
+
+func sanitizeAttachmentFilename(filename string) string {
+	normalized := strings.ReplaceAll(strings.TrimSpace(filename), "\\", "/")
+	return path.Base(normalized)
+}
+
+func (uc *TaskUseCase) ensureFileStorageAvailable() error {
+	if !uc.hasFileStorage() {
+		return domainerror.NewDomainError(domainerror.CodeInternalError, "file storage is unavailable")
+	}
+	return nil
+}
+
+func (uc *TaskUseCase) publishAttachmentCleanupRequested(ctx context.Context, taskID, attachmentID uuid.UUID, objectKey string) error {
+	if !uc.hasEventPublisher() {
+		return domainerror.NewDomainError(domainerror.CodeInternalError, "attachment cleanup is unavailable")
+	}
+
+	evt := event.NewTaskAttachmentCleanupRequested(taskID, attachmentID, objectKey)
+	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
+		return domainerror.Wrap(domainerror.CodeInternalError, "failed to publish attachment cleanup request", err)
+	}
+	return nil
+}
+
+func (uc *TaskUseCase) deleteAttachmentObject(ctx context.Context, taskID, attachmentID uuid.UUID, objectKey string) error {
+	if !uc.hasFileStorage() {
+		return uc.publishAttachmentCleanupRequested(ctx, taskID, attachmentID, objectKey)
+	}
+
+	if err := uc.fileStorage.Delete(ctx, objectKey); err != nil {
+		uc.logger.Error("failed to delete attachment from storage", "taskId", taskID, "attachmentId", attachmentID, "objectKey", objectKey, "error", err)
+		return uc.publishAttachmentCleanupRequested(ctx, taskID, attachmentID, objectKey)
+	}
+
+	return nil
+}
+
+func (uc *TaskUseCase) publishTaskEvent(ctx context.Context, evt event.Event) {
+	if !uc.hasEventPublisher() {
+		uc.logger.Warn("task event publisher unavailable", "eventType", evt.EventType(), "aggregateId", evt.AggregateID())
+		return
+	}
+	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
+		uc.logger.Error("failed to publish task event", "eventType", evt.EventType(), "aggregateId", evt.AggregateID(), "error", err)
+	}
+}
+
+func (uc *TaskUseCase) hasFileStorage() bool {
+	return !isNilDependency(uc.fileStorage)
+}
+
+func (uc *TaskUseCase) hasEventPublisher() bool {
+	return !isNilDependency(uc.eventPublisher)
+}
+
+func isNilDependency(dep any) bool {
+	if dep == nil {
+		return true
+	}
+	v := reflect.ValueOf(dep)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 // invalidateTaskCaches removes the task cache and all list caches.

@@ -76,6 +76,7 @@ var (
 	ErrRoleNotFound       = NewDomainError(CodeNotFound, "role not found")
 	ErrPermissionNotFound = NewDomainError(CodeNotFound, "permission not found")
 	ErrLabelNotFound      = NewDomainError(CodeNotFound, "label not found")
+	ErrAttachmentNotFound = NewDomainError(CodeNotFound, "attachment not found")
 
 	// Conflict errors
 	ErrUserEmailExists = NewDomainError(CodeConflict, "user with this email already exists")

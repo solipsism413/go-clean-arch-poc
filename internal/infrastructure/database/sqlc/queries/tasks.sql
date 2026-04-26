@@ -62,7 +62,32 @@ SELECT EXISTS(SELECT 1 FROM tasks WHERE id = $1);
 
 -- name: SearchTasks :many
 SELECT * FROM tasks
-WHERE 
+WHERE
     (title ILIKE '%' || $1 || '%' OR description ILIKE '%' || $1 || '%')
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3;
+
+-- name: CreateTaskAttachment :one
+INSERT INTO task_attachments (
+    id, task_id, filename, s3_key, content_type, size_bytes, uploaded_by, created_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8
+)
+RETURNING *;
+
+-- name: GetTaskAttachment :one
+SELECT * FROM task_attachments
+WHERE id = $1;
+
+-- name: ListTaskAttachments :many
+SELECT * FROM task_attachments
+WHERE task_id = $1
+ORDER BY created_at DESC;
+
+-- name: DeleteTaskAttachment :exec
+DELETE FROM task_attachments
+WHERE id = $1;
+
+-- name: DeleteTaskAttachmentsByTask :exec
+DELETE FROM task_attachments
+WHERE task_id = $1;

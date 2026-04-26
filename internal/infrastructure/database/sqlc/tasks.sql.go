@@ -87,6 +87,51 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 	return i, err
 }
 
+const createTaskAttachment = `-- name: CreateTaskAttachment :one
+INSERT INTO task_attachments (
+    id, task_id, filename, s3_key, content_type, size_bytes, uploaded_by, created_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8
+)
+RETURNING id, task_id, filename, s3_key, content_type, size_bytes, uploaded_by, created_at
+`
+
+type CreateTaskAttachmentParams struct {
+	ID          uuid.UUID   `json:"id"`
+	TaskID      uuid.UUID   `json:"taskId"`
+	Filename    string      `json:"filename"`
+	S3Key       string      `json:"s3Key"`
+	ContentType *string     `json:"contentType"`
+	SizeBytes   *int64      `json:"sizeBytes"`
+	UploadedBy  pgtype.UUID `json:"uploadedBy"`
+	CreatedAt   time.Time   `json:"createdAt"`
+}
+
+func (q *Queries) CreateTaskAttachment(ctx context.Context, arg CreateTaskAttachmentParams) (TaskAttachment, error) {
+	row := q.db.QueryRow(ctx, createTaskAttachment,
+		arg.ID,
+		arg.TaskID,
+		arg.Filename,
+		arg.S3Key,
+		arg.ContentType,
+		arg.SizeBytes,
+		arg.UploadedBy,
+		arg.CreatedAt,
+	)
+	var i TaskAttachment
+	err := row.Scan(
+		&i.ID,
+		&i.TaskID,
+		&i.Filename,
+		&i.S3Key,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.UploadedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const deleteTask = `-- name: DeleteTask :exec
 DELETE FROM tasks
 WHERE id = $1
@@ -94,6 +139,26 @@ WHERE id = $1
 
 func (q *Queries) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteTask, id)
+	return err
+}
+
+const deleteTaskAttachment = `-- name: DeleteTaskAttachment :exec
+DELETE FROM task_attachments
+WHERE id = $1
+`
+
+func (q *Queries) DeleteTaskAttachment(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTaskAttachment, id)
+	return err
+}
+
+const deleteTaskAttachmentsByTask = `-- name: DeleteTaskAttachmentsByTask :exec
+DELETE FROM task_attachments
+WHERE task_id = $1
+`
+
+func (q *Queries) DeleteTaskAttachmentsByTask(ctx context.Context, taskID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTaskAttachmentsByTask, taskID)
 	return err
 }
 
@@ -118,6 +183,62 @@ func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (Task, error) {
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getTaskAttachment = `-- name: GetTaskAttachment :one
+SELECT id, task_id, filename, s3_key, content_type, size_bytes, uploaded_by, created_at FROM task_attachments
+WHERE id = $1
+`
+
+func (q *Queries) GetTaskAttachment(ctx context.Context, id uuid.UUID) (TaskAttachment, error) {
+	row := q.db.QueryRow(ctx, getTaskAttachment, id)
+	var i TaskAttachment
+	err := row.Scan(
+		&i.ID,
+		&i.TaskID,
+		&i.Filename,
+		&i.S3Key,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.UploadedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const listTaskAttachments = `-- name: ListTaskAttachments :many
+SELECT id, task_id, filename, s3_key, content_type, size_bytes, uploaded_by, created_at FROM task_attachments
+WHERE task_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListTaskAttachments(ctx context.Context, taskID uuid.UUID) ([]TaskAttachment, error) {
+	rows, err := q.db.Query(ctx, listTaskAttachments, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TaskAttachment{}
+	for rows.Next() {
+		var i TaskAttachment
+		if err := rows.Scan(
+			&i.ID,
+			&i.TaskID,
+			&i.Filename,
+			&i.S3Key,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.UploadedBy,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTasks = `-- name: ListTasks :many
@@ -296,7 +417,7 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusPa
 
 const searchTasks = `-- name: SearchTasks :many
 SELECT id, title, description, status, priority, due_date, assignee_id, creator_id, created_at, updated_at FROM tasks
-WHERE 
+WHERE
     (title ILIKE '%' || $1 || '%' OR description ILIKE '%' || $1 || '%')
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3

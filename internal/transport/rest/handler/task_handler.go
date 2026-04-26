@@ -3,8 +3,12 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
+	"mime"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
@@ -14,6 +18,8 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 )
+
+const maxAttachmentUploadSize = 32 << 20
 
 // TaskHandler handles task-related HTTP requests.
 type TaskHandler struct {
@@ -483,6 +489,188 @@ func (h *TaskHandler) RemoveLabel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	presenter.JSON(w, http.StatusOK, task)
+}
+
+// UploadAttachment handles POST /tasks/{id}/attachments
+// @Summary Upload an attachment to a task
+// @Description Upload a file attachment to a specific task
+// @Tags tasks
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Param file formData file true "File to upload"
+// @Success 201 {object} presenter.Response{data=dto.TaskAttachmentOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/attachments [post]
+func (h *TaskHandler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxAttachmentUploadSize)
+
+	if err := r.ParseMultipartForm(maxAttachmentUploadSize); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			presenter.Error(w, http.StatusRequestEntityTooLarge, "Attachment exceeds maximum size of 32 MB", err)
+			return
+		}
+		presenter.Error(w, http.StatusBadRequest, "Invalid multipart form", err)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, "Failed to read file", err)
+		return
+	}
+	defer file.Close()
+
+	attachment, err := h.taskService.UploadTaskAttachment(r.Context(), id, header.Filename, header.Header.Get("Content-Type"), file)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	presenter.JSON(w, http.StatusCreated, attachment)
+}
+
+// DownloadAttachment handles GET /tasks/{id}/attachments/{attachmentId}
+// @Summary Download a task attachment
+// @Description Download a file attachment by ID
+// @Tags tasks
+// @Param id path string true "Task ID" format(uuid)
+// @Param attachmentId path string true "Attachment ID" format(uuid)
+// @Success 200 {file} binary
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/attachments/{attachmentId} [get]
+func (h *TaskHandler) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionRead) {
+		return
+	}
+
+	attachmentID, err := uuid.Parse(r.PathValue("attachmentId"))
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, "Invalid attachment ID", err)
+		return
+	}
+
+	reader, attachment, err := h.taskService.DownloadTaskAttachment(r.Context(), id, attachmentID)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	defer reader.Close()
+
+	w.Header().Set("Content-Type", attachment.ContentType)
+	if disposition := mime.FormatMediaType("attachment", map[string]string{"filename": attachment.Filename}); disposition != "" {
+		w.Header().Set("Content-Disposition", disposition)
+	}
+	if attachment.SizeBytes > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(attachment.SizeBytes, 10))
+	}
+
+	if _, err := io.Copy(w, reader); err != nil {
+		h.logger.Error("failed to stream attachment", "error", err)
+	}
+}
+
+// ListAttachments handles GET /tasks/{id}/attachments
+// @Summary List task attachments
+// @Description Get all attachments for a task
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Success 200 {object} presenter.Response{data=dto.TaskAttachmentListOutput}
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/attachments [get]
+func (h *TaskHandler) ListAttachments(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionRead) {
+		return
+	}
+
+	attachments, err := h.taskService.ListTaskAttachments(r.Context(), id)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	presenter.JSON(w, http.StatusOK, attachments)
+}
+
+// DeleteAttachment handles DELETE /tasks/{id}/attachments/{attachmentId}
+// @Summary Delete a task attachment
+// @Description Remove a file attachment from a task
+// @Tags tasks
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID" format(uuid)
+// @Param attachmentId path string true "Attachment ID" format(uuid)
+// @Success 204 "No Content"
+// @Failure 400 {object} presenter.ErrorResponse
+// @Failure 401 {object} presenter.ErrorResponse
+// @Failure 403 {object} presenter.ErrorResponse
+// @Failure 404 {object} presenter.ErrorResponse
+// @Failure 500 {object} presenter.ErrorResponse
+// @Security BearerAuth
+// @Router /tasks/{id}/attachments/{attachmentId} [delete]
+func (h *TaskHandler) DeleteAttachment(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, "Invalid task ID", err)
+		return
+	}
+
+	if !h.checkACL(w, r, id, acl.PermissionWrite) {
+		return
+	}
+
+	attachmentID, err := uuid.Parse(r.PathValue("attachmentId"))
+	if err != nil {
+		presenter.Error(w, http.StatusBadRequest, "Invalid attachment ID", err)
+		return
+	}
+
+	if err := h.taskService.DeleteTaskAttachment(r.Context(), id, attachmentID); err != nil {
+		handleError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // checkACL is a helper method to perform manual ACL checks in handlers.

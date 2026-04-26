@@ -28,11 +28,10 @@ This file is the single operational view for implementation progress, current pr
 
 ## Next
 
-- [ ] Implement task attachment upload and download flows backed by S3 or MinIO.
+- [ ] Add stronger observability around attachment cleanup retries and storage failures.
 
 ## Later
 
-- [ ] Add stronger observability around health, readiness, metrics, and tracing.
 - [ ] Improve capability parity across REST, GraphQL, gRPC, and realtime transports.
 
 ## Notes
@@ -41,11 +40,13 @@ This file is the single operational view for implementation progress, current pr
   Reference: `internal/transport/graphql/`, `cmd/server/main.go`
 - gRPC services are fully implemented and registered for task, user, auth, and label operations.
   Reference: `cmd/grpc/main.go`, `internal/transport/grpc/services.go`
-- File storage is initialized, but no user-facing attachment workflow exists yet.
-  Reference: `internal/infrastructure/storage/`, `migrations/000001_init.up.sql`
+- Task attachment workflows are available over REST and store blobs in S3 or MinIO.
+  Reference: `internal/transport/rest/handler/task_handler.go`, `internal/application/usecase/task/task_usecase.go`
+- Attachment uploads enforce a 32 MiB request limit, and failed blob deletions publish retry events for background cleanup.
+  Reference: `internal/transport/rest/handler/task_handler.go`, `internal/domain/event/task_events.go`, `cmd/server/main.go`, `cmd/grpc/main.go`
 
 ## Scope Summary
 
 - Working today: REST API, GraphQL HTTP endpoint, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
-- Partial today: file storage adapters without user-facing workflows.
-- Main gap today: expanded observability, attachment workflows, and transport capability parity beyond the core REST, GraphQL, and gRPC surfaces.
+- Partial today: attachment cleanup retries depend on Kafka-backed background consumers.
+- Main gap today: expanded observability and transport capability parity beyond the core REST, GraphQL, and gRPC surfaces.

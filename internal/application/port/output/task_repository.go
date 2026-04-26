@@ -38,6 +38,24 @@ type PaginatedResult struct {
 	TotalPages int
 }
 
+// TaskAttachmentRepository defines the output port for task attachment persistence.
+type TaskAttachmentRepository interface {
+	// SaveAttachment creates a new task attachment record.
+	SaveAttachment(ctx context.Context, attachment *entity.TaskAttachment) error
+
+	// FindAttachmentByID retrieves an attachment by ID.
+	FindAttachmentByID(ctx context.Context, id uuid.UUID) (*entity.TaskAttachment, error)
+
+	// FindAttachmentsByTaskID retrieves all attachments for a task.
+	FindAttachmentsByTaskID(ctx context.Context, taskID uuid.UUID) ([]*entity.TaskAttachment, error)
+
+	// DeleteAttachment removes an attachment by ID.
+	DeleteAttachment(ctx context.Context, id uuid.UUID) error
+
+	// DeleteAttachmentsByTaskID removes all attachments for a task.
+	DeleteAttachmentsByTaskID(ctx context.Context, taskID uuid.UUID) error
+}
+
 // TaskRepository defines the output port for task persistence.
 type TaskRepository interface {
 	// Save creates a new task.

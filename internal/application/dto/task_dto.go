@@ -126,6 +126,22 @@ type Pagination struct {
 	SortDesc bool   `json:"sortDesc,omitempty"`
 }
 
+// TaskAttachmentOutput represents the output for a task attachment.
+type TaskAttachmentOutput struct {
+	ID          uuid.UUID `json:"id"`
+	TaskID      uuid.UUID `json:"taskId"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"contentType"`
+	SizeBytes   int64     `json:"sizeBytes"`
+	UploadedBy  uuid.UUID `json:"uploadedBy"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+// TaskAttachmentListOutput represents a list of task attachments.
+type TaskAttachmentListOutput struct {
+	Attachments []TaskAttachmentOutput `json:"attachments"`
+}
+
 // DefaultPagination returns default pagination values.
 func DefaultPagination() Pagination {
 	return Pagination{

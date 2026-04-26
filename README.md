@@ -16,6 +16,7 @@ Task management application built in Go with a ports-and-adapters style architec
 - Working HTTP server with REST routes, JWT auth, RBAC and ACL checks, and Swagger support.
 - Self-registration is available at `POST /api/v1/auth/register` and returns JWT tokens.
 - Label CRUD is available over REST with case-insensitive unique names.
+- Task attachment upload, list, download, and delete flows are available over REST and use S3 or MinIO for blob storage.
 - Realtime transports available through WebSocket, SSE, and Socket.IO.
 - PostgreSQL, Redis, Kafka, and S3 or MinIO bootstrap are already wired.
 - GraphQL exists as schema-only and is not yet exposed over HTTP.
@@ -57,6 +58,18 @@ go run ./cmd/grpc
 - SSE: `GET /events`
 - Socket.IO: `GET /socket.io/`
 
+## Attachment Endpoints
+
+- `POST /api/v1/tasks/{id}/attachments` uploads a task attachment using `multipart/form-data`.
+- `GET /api/v1/tasks/{id}/attachments` lists task attachments.
+- `GET /api/v1/tasks/{id}/attachments/{attachmentId}` downloads an attachment.
+- `DELETE /api/v1/tasks/{id}/attachments/{attachmentId}` removes attachment metadata and deletes the blob from storage.
+
+Notes:
+
+- Attachment uploads enforce a maximum request size of 32 MiB.
+- Attachment cleanup retries are published as task events when immediate blob deletion fails.
+
 ## Development Commands
 
 ```bash
@@ -76,6 +89,7 @@ Seeded development users are created with password `password123`.
 ## Notes
 
 - Invalid pagination query params now return `400 Bad Request` instead of being silently coerced.
+- Task attachment blobs are stored in S3 or MinIO under unique per-upload object keys while preserving the original filename in API responses.
 - GraphQL schema exists in `internal/transport/graphql/schema.graphqls`, but no HTTP endpoint is active yet.
 - gRPC server bootstraps successfully on `cfg.GRPC.Port` with fully registered task, user, auth, and label services.
 

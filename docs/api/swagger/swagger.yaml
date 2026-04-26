@@ -134,6 +134,30 @@ definitions:
       updatedAt:
         type: string
     type: object
+  dto.TaskAttachmentListOutput:
+    properties:
+      attachments:
+        items:
+          $ref: '#/definitions/dto.TaskAttachmentOutput'
+        type: array
+    type: object
+  dto.TaskAttachmentOutput:
+    properties:
+      contentType:
+        type: string
+      createdAt:
+        type: string
+      filename:
+        type: string
+      id:
+        type: string
+      sizeBytes:
+        type: integer
+      taskId:
+        type: string
+      uploadedBy:
+        type: string
+    type: object
   dto.TaskListOutput:
     properties:
       page:
@@ -1032,6 +1056,201 @@ paths:
       security:
       - BearerAuth: []
       summary: Assign a task
+      tags:
+      - tasks
+  /tasks/{id}/attachments:
+    get:
+      consumes:
+      - application/json
+      description: Get all attachments for a task
+      parameters:
+      - description: Task ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/presenter.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.TaskAttachmentListOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List task attachments
+      tags:
+      - tasks
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a file attachment to a specific task
+      parameters:
+      - description: Task ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/presenter.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.TaskAttachmentOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload an attachment to a task
+      tags:
+      - tasks
+  /tasks/{id}/attachments/{attachmentId}:
+    delete:
+      consumes:
+      - application/json
+      description: Remove a file attachment from a task
+      parameters:
+      - description: Task ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Attachment ID
+        format: uuid
+        in: path
+        name: attachmentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a task attachment
+      tags:
+      - tasks
+    get:
+      description: Download a file attachment by ID
+      parameters:
+      - description: Task ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Attachment ID
+        format: uuid
+        in: path
+        name: attachmentId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenter.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Download a task attachment
       tags:
       - tasks
   /tasks/{id}/complete:

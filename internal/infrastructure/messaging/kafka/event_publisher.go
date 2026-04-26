@@ -299,6 +299,10 @@ func deserializeEvent(eventType string, data []byte) (event.Event, error) {
 		var e event.TaskLabelRemoved
 		err = json.Unmarshal(data, &e)
 		evt = &e
+	case "task.attachment_cleanup_requested":
+		var e event.TaskAttachmentCleanupRequested
+		err = json.Unmarshal(data, &e)
+		evt = &e
 	// User events
 	case "user.created":
 		var e event.UserCreated

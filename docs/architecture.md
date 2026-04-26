@@ -77,17 +77,18 @@ It is responsible for:
 - constructing repositories and use cases
 - constructing JWT auth, RBAC, and ACL middleware dependencies
 - registering REST, WebSocket, SSE, and Socket.IO transports
+- registering background consumers for task-event retries such as attachment cleanup
 - starting the HTTP server and handling graceful shutdown
 
 ### gRPC Server
 
-`cmd/grpc/main.go` mirrors much of the same bootstrap work, but the gRPC transport is not fully implemented yet.
+`cmd/grpc/main.go` mirrors the same dependency bootstrap for gRPC service hosting.
 
 Current state:
 
-- server shell exists
-- no concrete service registration is performed
-- configured gRPC port support exists in config, but the entrypoint still uses a fixed port value
+- concrete task, user, auth, and label services are registered
+- Kafka-backed background consumers are also started for task-event retries such as attachment cleanup
+- configured gRPC port support is active through `cfg.GRPC.Port`
 
 ## Security Model
 
@@ -114,6 +115,8 @@ PostgreSQL is the primary system of record. The schema is defined in `migrations
 - tasks and labels
 - ACL entries
 - task attachment metadata
+
+Attachment blob data itself lives in S3 or MinIO. The database stores attachment metadata and object keys, while cleanup retries are published as task events when immediate blob deletion fails.
 
 Persistence implementation combines:
 

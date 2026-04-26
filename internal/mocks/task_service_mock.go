@@ -6,6 +6,7 @@ package mocks
 
 import (
 	"context"
+	"io"
 
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
@@ -523,6 +524,151 @@ func (_c *MockTaskService_DeleteTask_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
+// DeleteTaskAttachment provides a mock function for the type MockTaskService
+func (_mock *MockTaskService) DeleteTaskAttachment(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) error {
+	ret := _mock.Called(ctx, taskID, attachmentID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteTaskAttachment")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID) error); ok {
+		r0 = returnFunc(ctx, taskID, attachmentID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockTaskService_DeleteTaskAttachment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteTaskAttachment'
+type MockTaskService_DeleteTaskAttachment_Call struct {
+	*mock.Call
+}
+
+// DeleteTaskAttachment is a helper method to define mock.On call
+//   - ctx context.Context
+//   - taskID uuid.UUID
+//   - attachmentID uuid.UUID
+func (_e *MockTaskService_Expecter) DeleteTaskAttachment(ctx interface{}, taskID interface{}, attachmentID interface{}) *MockTaskService_DeleteTaskAttachment_Call {
+	return &MockTaskService_DeleteTaskAttachment_Call{Call: _e.mock.On("DeleteTaskAttachment", ctx, taskID, attachmentID)}
+}
+
+func (_c *MockTaskService_DeleteTaskAttachment_Call) Run(run func(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID)) *MockTaskService_DeleteTaskAttachment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 uuid.UUID
+		if args[2] != nil {
+			arg2 = args[2].(uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockTaskService_DeleteTaskAttachment_Call) Return(err error) *MockTaskService_DeleteTaskAttachment_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockTaskService_DeleteTaskAttachment_Call) RunAndReturn(run func(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) error) *MockTaskService_DeleteTaskAttachment_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DownloadTaskAttachment provides a mock function for the type MockTaskService
+func (_mock *MockTaskService) DownloadTaskAttachment(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) (io.ReadCloser, *dto.TaskAttachmentOutput, error) {
+	ret := _mock.Called(ctx, taskID, attachmentID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadTaskAttachment")
+	}
+
+	var r0 io.ReadCloser
+	var r1 *dto.TaskAttachmentOutput
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID) (io.ReadCloser, *dto.TaskAttachmentOutput, error)); ok {
+		return returnFunc(ctx, taskID, attachmentID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID) io.ReadCloser); ok {
+		r0 = returnFunc(ctx, taskID, attachmentID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, uuid.UUID) *dto.TaskAttachmentOutput); ok {
+		r1 = returnFunc(ctx, taskID, attachmentID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*dto.TaskAttachmentOutput)
+		}
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, uuid.UUID, uuid.UUID) error); ok {
+		r2 = returnFunc(ctx, taskID, attachmentID)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockTaskService_DownloadTaskAttachment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DownloadTaskAttachment'
+type MockTaskService_DownloadTaskAttachment_Call struct {
+	*mock.Call
+}
+
+// DownloadTaskAttachment is a helper method to define mock.On call
+//   - ctx context.Context
+//   - taskID uuid.UUID
+//   - attachmentID uuid.UUID
+func (_e *MockTaskService_Expecter) DownloadTaskAttachment(ctx interface{}, taskID interface{}, attachmentID interface{}) *MockTaskService_DownloadTaskAttachment_Call {
+	return &MockTaskService_DownloadTaskAttachment_Call{Call: _e.mock.On("DownloadTaskAttachment", ctx, taskID, attachmentID)}
+}
+
+func (_c *MockTaskService_DownloadTaskAttachment_Call) Run(run func(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID)) *MockTaskService_DownloadTaskAttachment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 uuid.UUID
+		if args[2] != nil {
+			arg2 = args[2].(uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockTaskService_DownloadTaskAttachment_Call) Return(readCloser io.ReadCloser, taskAttachmentOutput *dto.TaskAttachmentOutput, err error) *MockTaskService_DownloadTaskAttachment_Call {
+	_c.Call.Return(readCloser, taskAttachmentOutput, err)
+	return _c
+}
+
+func (_c *MockTaskService_DownloadTaskAttachment_Call) RunAndReturn(run func(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) (io.ReadCloser, *dto.TaskAttachmentOutput, error)) *MockTaskService_DownloadTaskAttachment_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetOverdueTasks provides a mock function for the type MockTaskService
 func (_mock *MockTaskService) GetOverdueTasks(ctx context.Context, pagination dto.Pagination) (*dto.TaskListOutput, error) {
 	ret := _mock.Called(ctx, pagination)
@@ -655,6 +801,74 @@ func (_c *MockTaskService_GetTask_Call) Return(taskOutput *dto.TaskOutput, err e
 }
 
 func (_c *MockTaskService_GetTask_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID) (*dto.TaskOutput, error)) *MockTaskService_GetTask_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListTaskAttachments provides a mock function for the type MockTaskService
+func (_mock *MockTaskService) ListTaskAttachments(ctx context.Context, taskID uuid.UUID) (*dto.TaskAttachmentListOutput, error) {
+	ret := _mock.Called(ctx, taskID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListTaskAttachments")
+	}
+
+	var r0 *dto.TaskAttachmentListOutput
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*dto.TaskAttachmentListOutput, error)); ok {
+		return returnFunc(ctx, taskID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID) *dto.TaskAttachmentListOutput); ok {
+		r0 = returnFunc(ctx, taskID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*dto.TaskAttachmentListOutput)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = returnFunc(ctx, taskID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockTaskService_ListTaskAttachments_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListTaskAttachments'
+type MockTaskService_ListTaskAttachments_Call struct {
+	*mock.Call
+}
+
+// ListTaskAttachments is a helper method to define mock.On call
+//   - ctx context.Context
+//   - taskID uuid.UUID
+func (_e *MockTaskService_Expecter) ListTaskAttachments(ctx interface{}, taskID interface{}) *MockTaskService_ListTaskAttachments_Call {
+	return &MockTaskService_ListTaskAttachments_Call{Call: _e.mock.On("ListTaskAttachments", ctx, taskID)}
+}
+
+func (_c *MockTaskService_ListTaskAttachments_Call) Run(run func(ctx context.Context, taskID uuid.UUID)) *MockTaskService_ListTaskAttachments_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockTaskService_ListTaskAttachments_Call) Return(taskAttachmentListOutput *dto.TaskAttachmentListOutput, err error) *MockTaskService_ListTaskAttachments_Call {
+	_c.Call.Return(taskAttachmentListOutput, err)
+	return _c
+}
+
+func (_c *MockTaskService_ListTaskAttachments_Call) RunAndReturn(run func(ctx context.Context, taskID uuid.UUID) (*dto.TaskAttachmentListOutput, error)) *MockTaskService_ListTaskAttachments_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1019,6 +1233,92 @@ func (_c *MockTaskService_UpdateTask_Call) Return(taskOutput *dto.TaskOutput, er
 }
 
 func (_c *MockTaskService_UpdateTask_Call) RunAndReturn(run func(ctx context.Context, id uuid.UUID, input dto.UpdateTaskInput) (*dto.TaskOutput, error)) *MockTaskService_UpdateTask_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UploadTaskAttachment provides a mock function for the type MockTaskService
+func (_mock *MockTaskService) UploadTaskAttachment(ctx context.Context, taskID uuid.UUID, filename string, contentType string, reader io.Reader) (*dto.TaskAttachmentOutput, error) {
+	ret := _mock.Called(ctx, taskID, filename, contentType, reader)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UploadTaskAttachment")
+	}
+
+	var r0 *dto.TaskAttachmentOutput
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, string, io.Reader) (*dto.TaskAttachmentOutput, error)); ok {
+		return returnFunc(ctx, taskID, filename, contentType, reader)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, string, io.Reader) *dto.TaskAttachmentOutput); ok {
+		r0 = returnFunc(ctx, taskID, filename, contentType, reader)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*dto.TaskAttachmentOutput)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uuid.UUID, string, string, io.Reader) error); ok {
+		r1 = returnFunc(ctx, taskID, filename, contentType, reader)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockTaskService_UploadTaskAttachment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UploadTaskAttachment'
+type MockTaskService_UploadTaskAttachment_Call struct {
+	*mock.Call
+}
+
+// UploadTaskAttachment is a helper method to define mock.On call
+//   - ctx context.Context
+//   - taskID uuid.UUID
+//   - filename string
+//   - contentType string
+//   - reader io.Reader
+func (_e *MockTaskService_Expecter) UploadTaskAttachment(ctx interface{}, taskID interface{}, filename interface{}, contentType interface{}, reader interface{}) *MockTaskService_UploadTaskAttachment_Call {
+	return &MockTaskService_UploadTaskAttachment_Call{Call: _e.mock.On("UploadTaskAttachment", ctx, taskID, filename, contentType, reader)}
+}
+
+func (_c *MockTaskService_UploadTaskAttachment_Call) Run(run func(ctx context.Context, taskID uuid.UUID, filename string, contentType string, reader io.Reader)) *MockTaskService_UploadTaskAttachment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uuid.UUID
+		if args[1] != nil {
+			arg1 = args[1].(uuid.UUID)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 io.Reader
+		if args[4] != nil {
+			arg4 = args[4].(io.Reader)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockTaskService_UploadTaskAttachment_Call) Return(taskAttachmentOutput *dto.TaskAttachmentOutput, err error) *MockTaskService_UploadTaskAttachment_Call {
+	_c.Call.Return(taskAttachmentOutput, err)
+	return _c
+}
+
+func (_c *MockTaskService_UploadTaskAttachment_Call) RunAndReturn(run func(ctx context.Context, taskID uuid.UUID, filename string, contentType string, reader io.Reader) (*dto.TaskAttachmentOutput, error)) *MockTaskService_UploadTaskAttachment_Call {
 	_c.Call.Return(run)
 	return _c
 }

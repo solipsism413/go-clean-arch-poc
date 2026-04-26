@@ -5,6 +5,7 @@ package input
 
 import (
 	"context"
+	"io"
 
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
@@ -54,4 +55,16 @@ type TaskService interface {
 
 	// GetOverdueTasks retrieves tasks that are past their due date.
 	GetOverdueTasks(ctx context.Context, pagination dto.Pagination) (*dto.TaskListOutput, error)
+
+	// UploadTaskAttachment uploads a file attachment to a task.
+	UploadTaskAttachment(ctx context.Context, taskID uuid.UUID, filename, contentType string, reader io.Reader) (*dto.TaskAttachmentOutput, error)
+
+	// DownloadTaskAttachment retrieves a file attachment by ID, verifying it belongs to the given task.
+	DownloadTaskAttachment(ctx context.Context, taskID, attachmentID uuid.UUID) (io.ReadCloser, *dto.TaskAttachmentOutput, error)
+
+	// ListTaskAttachments lists all attachments for a task.
+	ListTaskAttachments(ctx context.Context, taskID uuid.UUID) (*dto.TaskAttachmentListOutput, error)
+
+	// DeleteTaskAttachment removes an attachment by ID, verifying it belongs to the given task.
+	DeleteTaskAttachment(ctx context.Context, taskID, attachmentID uuid.UUID) error
 }

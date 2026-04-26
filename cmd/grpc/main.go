@@ -9,11 +9,14 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/handiism/go-clean-arch-poc/internal/application/port/output"
 	authUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
 	labelUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/label"
 	taskUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
+	"github.com/handiism/go-clean-arch-poc/internal/application/worker"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/auth/jwt"
 	redisCache "github.com/handiism/go-clean-arch-poc/internal/infrastructure/cache/redis"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
@@ -75,6 +78,16 @@ func main() {
 		defer eventPublisher.Close()
 	}
 
+	var eventSubscriber output.EventSubscriber
+	sub, err := kafka.NewEventSubscriber(ctx, cfg.Kafka, log)
+	if err != nil {
+		log.Warn("failed to initialize kafka event subscriber, background consumers will not run", "error", err)
+	} else {
+		eventSubscriber = sub
+		log.Info("connected to kafka event subscriber")
+		defer sub.Close()
+	}
+
 	// Initialize S3 file storage
 	fileStorage, err := s3Storage.NewFileStorage(ctx, cfg.S3, log)
 	if err != nil {
@@ -100,10 +113,35 @@ func main() {
 	v := validation.NewValidator()
 
 	// Initialize use cases
-	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, tm, v, log)
+	taskService := taskUseCase.NewTaskUseCase(taskRepo, taskRepo, userRepo, labelRepo, fileStorage, cacheRepo, eventPublisher, tm, v, log)
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, tokenService, v, log)
 	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
+
+	eventConsumer := worker.NewEventConsumer(log)
+	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", func(ctx context.Context, evt event.Event) error {
+		cleanupEvent, ok := evt.(*event.TaskAttachmentCleanupRequested)
+		if !ok {
+			return fmt.Errorf("unexpected event type %T", evt)
+		}
+		if fileStorage == nil {
+			return fmt.Errorf("file storage unavailable for cleanup retry")
+		}
+		if err := fileStorage.Delete(ctx, cleanupEvent.ObjectKey); err != nil {
+			return err
+		}
+		log.Info("background handler: attachment cleanup completed", "taskID", cleanupEvent.AggregateID(), "attachmentId", cleanupEvent.AttachmentID)
+		return nil
+	})
+
+	if eventSubscriber != nil {
+		if err := eventConsumer.Start(ctx, eventSubscriber, []string{output.TopicTaskEvents, output.TopicUserEvents}); err != nil {
+			log.Warn("failed to start event consumer", "error", err)
+		} else {
+			log.Info("background event consumer started")
+			defer eventConsumer.Stop()
+		}
+	}
 
 	// =====================
 	// Initialize gRPC Server

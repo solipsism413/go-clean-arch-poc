@@ -13,10 +13,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/handiism/go-clean-arch-poc/internal/application/port/output"
 	authusecase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/auth"
 	labelusecase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/label"
 	taskusecase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
@@ -45,6 +47,7 @@ type TestApp struct {
 	Server       *httptest.Server
 	Pool         *pgxpool.Pool
 	Container    *tcpostgres.PostgresContainer
+	FileStorage  *testFileStorage
 	TokenService *jwt.TokenService
 	Logger       *slog.Logger
 }
@@ -140,7 +143,10 @@ func SetupTestApp(t *testing.T) *TestApp {
 	// Create use cases
 	authUseCase := authusecase.NewAuthUseCase(userRepo, roleRepo, cache, eventPublisher, tm, tokenService, validator, logger)
 	userUseCase := userusecase.NewUserUseCase(userRepo, roleRepo, cache, eventPublisher, tm, validator, logger)
-	taskUseCase := taskusecase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cache, eventPublisher, tm, validator, logger)
+	// Create in-memory file storage for tests
+	fileStorage := &testFileStorage{files: make(map[string][]byte)}
+
+	taskUseCase := taskusecase.NewTaskUseCase(taskRepo, taskRepo, userRepo, labelRepo, fileStorage, cache, eventPublisher, tm, validator, logger)
 	labelUseCase := labelusecase.NewLabelUseCase(labelRepo, validator, logger)
 	require.NoError(t, userUseCase.SeedSystemRoles(ctx))
 
@@ -161,6 +167,7 @@ func SetupTestApp(t *testing.T) *TestApp {
 		Server:       server,
 		Pool:         pool,
 		Container:    container,
+		FileStorage:  fileStorage,
 		TokenService: tokenService,
 		Logger:       logger,
 	}
@@ -236,6 +243,24 @@ func (app *TestApp) DoRequest(t *testing.T, method, path string, body any, token
 	return resp
 }
 
+// DoMultipartRequest performs a multipart form HTTP request to the test server
+func (app *TestApp) DoMultipartRequest(t *testing.T, method, path string, body io.Reader, contentType, token string) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(method, app.Server.URL+path, body)
+	require.NoError(t, err)
+
+	req.Header.Set("Content-Type", contentType)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+
+	return resp
+}
+
 // ParseResponse parses JSON response into the given type
 func ParseResponse[T any](t *testing.T, resp *http.Response) T {
 	t.Helper()
@@ -280,4 +305,86 @@ func findMigrationsPath() string {
 	}
 
 	panic("migrations directory not found")
+}
+
+// testFileStorage is a simple in-memory file storage for tests.
+type testFileStorage struct {
+	mu    sync.RWMutex
+	files map[string][]byte
+}
+
+func (fs *testFileStorage) Upload(ctx context.Context, key string, reader io.Reader, options output.UploadOptions) (*output.FileMetadata, error) {
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	fs.files[key] = data
+	return &output.FileMetadata{Key: key, Size: int64(len(data))}, nil
+}
+
+func (fs *testFileStorage) Download(ctx context.Context, key string) (io.ReadCloser, *output.FileMetadata, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	data, ok := fs.files[key]
+	if !ok {
+		return nil, nil, errors.New("file not found")
+	}
+	return io.NopCloser(bytes.NewReader(data)), &output.FileMetadata{Key: key, Size: int64(len(data))}, nil
+}
+
+func (fs *testFileStorage) Delete(ctx context.Context, key string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	delete(fs.files, key)
+	return nil
+}
+
+func (fs *testFileStorage) Exists(ctx context.Context, key string) (bool, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	_, ok := fs.files[key]
+	return ok, nil
+}
+
+func (fs *testFileStorage) GetMetadata(ctx context.Context, key string) (*output.FileMetadata, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	data, ok := fs.files[key]
+	if !ok {
+		return nil, errors.New("file not found")
+	}
+	return &output.FileMetadata{Key: key, Size: int64(len(data))}, nil
+}
+
+func (fs *testFileStorage) GeneratePresignedURL(ctx context.Context, key string, expiration time.Duration) (string, error) {
+	return "https://example.com/" + key, nil
+}
+
+func (fs *testFileStorage) GenerateUploadURL(ctx context.Context, key string, contentType string, expiration time.Duration) (string, error) {
+	return "https://example.com/upload/" + key, nil
+}
+
+func (fs *testFileStorage) List(ctx context.Context, prefix string, maxKeys int) ([]*output.FileMetadata, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	var result []*output.FileMetadata
+	for key, data := range fs.files {
+		if strings.HasPrefix(key, prefix) {
+			result = append(result, &output.FileMetadata{Key: key, Size: int64(len(data))})
+		}
+	}
+	return result, nil
+}
+
+func (fs *testFileStorage) Copy(ctx context.Context, sourceKey, destKey string) (*output.FileMetadata, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	data, ok := fs.files[sourceKey]
+	if !ok {
+		return nil, errors.New("source file not found")
+	}
+	fs.files[destKey] = data
+	return &output.FileMetadata{Key: destKey, Size: int64(len(data))}, nil
 }

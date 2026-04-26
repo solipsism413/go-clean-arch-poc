@@ -148,7 +148,7 @@ func main() {
 	v := validation.NewValidator()
 
 	// Initialize use cases
-	taskService := taskUseCase.NewTaskUseCase(taskRepo, userRepo, labelRepo, cacheRepo, eventPublisher, tm, v, log)
+	taskService := taskUseCase.NewTaskUseCase(taskRepo, taskRepo, userRepo, labelRepo, fileStorage, cacheRepo, eventPublisher, tm, v, log)
 	userService := userUseCase.NewUserUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, v, log)
 	authService := authUseCase.NewAuthUseCase(userRepo, roleRepo, cacheRepo, eventPublisher, tm, tokenService, v, log)
 	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
@@ -162,6 +162,20 @@ func main() {
 	})
 	eventConsumer.RegisterHandler("task.updated", func(ctx context.Context, evt event.Event) error {
 		log.Info("background handler: task updated", "taskID", evt.AggregateID())
+		return nil
+	})
+	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", func(ctx context.Context, evt event.Event) error {
+		cleanupEvent, ok := evt.(*event.TaskAttachmentCleanupRequested)
+		if !ok {
+			return fmt.Errorf("unexpected event type %T", evt)
+		}
+		if fileStorage == nil {
+			return fmt.Errorf("file storage unavailable for cleanup retry")
+		}
+		if err := fileStorage.Delete(ctx, cleanupEvent.ObjectKey); err != nil {
+			return err
+		}
+		log.Info("background handler: attachment cleanup completed", "taskID", cleanupEvent.AggregateID(), "attachmentId", cleanupEvent.AttachmentID)
 		return nil
 	})
 	eventConsumer.RegisterHandler("user.created", func(ctx context.Context, evt event.Event) error {
