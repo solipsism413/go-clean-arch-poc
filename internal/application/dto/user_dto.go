@@ -110,5 +110,6 @@ type TokenClaims struct {
 	Roles       []string    `json:"roles"`
 	RoleIDs     []uuid.UUID `json:"roleIds"`
 	Permissions []string    `json:"permissions"`
+	TokenID     string      `json:"tokenId"` // JWT ID (jti claim)
 	ExpiresAt   time.Time   `json:"expiresAt"`
 }

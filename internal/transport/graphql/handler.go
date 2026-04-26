@@ -54,6 +54,7 @@ func withOptionalAuth(authService input.AuthService, next http.Handler) http.Han
 		}
 
 		ctx := context.WithValue(r.Context(), auth.ClaimsContextKey, claims)
+		ctx = context.WithValue(ctx, auth.TokenContextKey, parts[1])
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

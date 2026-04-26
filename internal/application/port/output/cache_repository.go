@@ -2,8 +2,12 @@ package output
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+// ErrCacheMiss is returned when a cached key is not found.
+var ErrCacheMiss = errors.New("cache miss")
 
 // CacheRepository defines the output port for caching operations.
 type CacheRepository interface {
@@ -36,6 +40,12 @@ type CacheRepository interface {
 
 	// SetMultiple stores multiple key-value pairs.
 	SetMultiple(ctx context.Context, values map[string][]byte, expiration time.Duration) error
+
+	// GetJSON retrieves and unmarshals a JSON value.
+	GetJSON(ctx context.Context, key string, dest any) error
+
+	// SetJSON marshals and stores a value as JSON.
+	SetJSON(ctx context.Context, key string, value any, expiration time.Duration) error
 }
 
 // CacheKeyBuilder helps build consistent cache keys.
@@ -71,4 +81,24 @@ func (b *CacheKeyBuilder) TaskList(filterHash string) string {
 // Session returns a cache key for a user session.
 func (b *CacheKeyBuilder) Session(sessionID string) string {
 	return b.prefix + ":session:" + sessionID
+}
+
+// TokenBlacklist returns a cache key for a revoked token.
+func (b *CacheKeyBuilder) TokenBlacklist(tokenID string) string {
+	return b.prefix + ":token:blacklist:" + tokenID
+}
+
+// UserSessions returns a pattern for all sessions of a user.
+func (b *CacheKeyBuilder) UserSessions(userID string) string {
+	return b.prefix + ":session:" + userID + ":*"
+}
+
+// UserSession returns a cache key for a specific user session.
+func (b *CacheKeyBuilder) UserSession(userID, tokenID string) string {
+	return b.prefix + ":session:" + userID + ":" + tokenID
+}
+
+// UserList returns a cache key for a user list with filter hash.
+func (b *CacheKeyBuilder) UserList(filterHash string) string {
+	return b.prefix + ":users:list:" + filterHash
 }

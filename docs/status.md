@@ -24,14 +24,14 @@ This file is the single operational view for implementation progress, current pr
 - [x] Add CI, delivery automation, and release workflow support.
 - [x] Add background consumers or subscribers for published domain events.
 - [x] Expose GraphQL over HTTP using the existing schema.
+- [x] Expand Redis usage into token revocation, session invalidation, and read caching.
 
 ## Next
 
-- [ ] Expand Redis usage into token revocation, session invalidation, or read caching.
+- [ ] Implement task attachment upload and download flows backed by S3 or MinIO.
 
 ## Later
 
-- [ ] Implement task attachment upload and download flows backed by S3 or MinIO.
 - [ ] Add stronger observability around health, readiness, metrics, and tracing.
 - [ ] Improve capability parity across REST, GraphQL, gRPC, and realtime transports.
 
@@ -48,4 +48,4 @@ This file is the single operational view for implementation progress, current pr
 
 - Working today: REST API, GraphQL HTTP endpoint, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
 - Partial today: file storage adapters without user-facing workflows.
-- Main gap today: expanded Redis usage and attachment workflows beyond the core REST, GraphQL, and gRPC surfaces.
+- Main gap today: expanded observability, attachment workflows, and transport capability parity beyond the core REST, GraphQL, and gRPC surfaces.

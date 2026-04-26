@@ -4,6 +4,7 @@ package auth
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
@@ -17,6 +18,8 @@ import (
 )
 
 const defaultRegistrationRole = entity.RoleMember
+
+const cachePrefix = "app"
 
 // Ensure AuthUseCase implements input.AuthService.
 var _ input.AuthService = (*AuthUseCase)(nil)
@@ -140,15 +143,40 @@ func (uc *AuthUseCase) Login(ctx context.Context, input dto.LoginInput) (*dto.Au
 }
 
 // Logout invalidates the user's session/tokens.
-func (uc *AuthUseCase) Logout(ctx context.Context, userID uuid.UUID) error {
-	// In a stateless JWT setup, we can use a blacklist in Redis
-	// For now, just publish the event
-	user, err := uc.userRepo.FindByID(ctx, userID)
+func (uc *AuthUseCase) Logout(ctx context.Context, userID uuid.UUID, accessToken string) error {
+	// Extract token ID from the raw access token
+	tokenID, err := uc.tokenService.ExtractTokenID(accessToken)
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return domainerror.ErrUserNotFound
+
+	if uc.cache != nil {
+		// Validate token to get claims and extract refresh token JTI from session
+		claims, err := uc.tokenService.ValidateToken(ctx, accessToken)
+		if err == nil && claims != nil {
+			remainingTTL := time.Until(claims.ExpiresAt)
+			if remainingTTL > 0 {
+				// Blacklist access token
+				blacklistKey := output.NewCacheKeyBuilder(cachePrefix).TokenBlacklist(tokenID)
+				_ = uc.cache.Set(ctx, blacklistKey, []byte("revoked"), remainingTTL)
+			}
+		}
+
+		// Find session and blacklist refresh token too
+		sessionKey := output.NewCacheKeyBuilder(cachePrefix).UserSession(userID.String(), tokenID)
+		var sessionData map[string]any
+		if err := uc.cache.GetJSON(ctx, sessionKey, &sessionData); err == nil {
+			if refreshTokenID, ok := sessionData["refreshTokenId"].(string); ok && refreshTokenID != "" {
+				refreshBlacklistKey := output.NewCacheKeyBuilder(cachePrefix).TokenBlacklist(refreshTokenID)
+				_ = uc.cache.Set(ctx, refreshBlacklistKey, []byte("revoked"), uc.tokenService.RefreshTokenTTL())
+				// Delete refresh token session too
+				refreshSessionKey := output.NewCacheKeyBuilder(cachePrefix).UserSession(userID.String(), refreshTokenID)
+				_ = uc.cache.Delete(ctx, refreshSessionKey)
+			}
+		}
+
+		// Delete the access token session
+		_ = uc.cache.Delete(ctx, sessionKey)
 	}
 
 	// Publish logout event
@@ -168,6 +196,25 @@ func (uc *AuthUseCase) RefreshToken(ctx context.Context, refreshToken string) (*
 	userID, err := uc.tokenService.ValidateRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return nil, domainerror.ErrInvalidToken
+	}
+
+	// Check if refresh token has been revoked or its session invalidated
+	if uc.cache != nil {
+		tokenID, err := uc.tokenService.ExtractTokenID(refreshToken)
+		if err == nil && tokenID != "" {
+			blacklistKey := output.NewCacheKeyBuilder(cachePrefix).TokenBlacklist(tokenID)
+			revoked, _ := uc.cache.Exists(ctx, blacklistKey)
+			if revoked {
+				return nil, domainerror.ErrInvalidToken
+			}
+
+			// Verify the session still exists (handles bulk invalidation)
+			sessionKey := output.NewCacheKeyBuilder(cachePrefix).UserSession(userID.String(), tokenID)
+			hasSession, _ := uc.cache.Exists(ctx, sessionKey)
+			if !hasSession {
+				return nil, domainerror.ErrInvalidToken
+			}
+		}
 	}
 
 	// Get user
@@ -208,6 +255,29 @@ func (uc *AuthUseCase) generateAuthOutput(ctx context.Context, user *entity.User
 
 	authOutput.User = dto.UserFromEntity(user)
 
+	// Store sessions in Redis for invalidation support
+	if uc.cache != nil {
+		accessTokenID, _ := uc.tokenService.ExtractTokenID(authOutput.AccessToken)
+		refreshTokenID, _ := uc.tokenService.ExtractTokenID(authOutput.RefreshToken)
+		if accessTokenID != "" {
+			sessionData := map[string]any{
+				"userId":         user.ID.String(),
+				"accessTokenId":  accessTokenID,
+				"refreshTokenId": refreshTokenID,
+				"createdAt":      time.Now().UTC(),
+				"expiresAt":      authOutput.ExpiresAt,
+			}
+			// Store session keyed by access token JTI
+			accessSessionKey := output.NewCacheKeyBuilder(cachePrefix).UserSession(user.ID.String(), accessTokenID)
+			_ = uc.cache.SetJSON(ctx, accessSessionKey, sessionData, uc.tokenService.RefreshTokenTTL())
+			// Also store session keyed by refresh token JTI so RefreshToken can validate it
+			if refreshTokenID != "" {
+				refreshSessionKey := output.NewCacheKeyBuilder(cachePrefix).UserSession(user.ID.String(), refreshTokenID)
+				_ = uc.cache.SetJSON(ctx, refreshSessionKey, sessionData, uc.tokenService.RefreshTokenTTL())
+			}
+		}
+	}
+
 	return authOutput, nil
 }
 
@@ -242,6 +312,9 @@ func (uc *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, inp
 		return err
 	}
 
+	// Invalidate all sessions so user must re-login everywhere
+	uc.invalidateAllUserSessions(ctx, userID)
+
 	// Publish event
 	evt := event.NewUserPasswordChanged(userID)
 	if err := uc.eventPublisher.Publish(ctx, output.TopicUserEvents, evt); err != nil {
@@ -253,7 +326,46 @@ func (uc *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, inp
 	return nil
 }
 
-// ValidateToken validates an access token.
+// ValidateToken validates an access token and checks the revocation list.
 func (uc *AuthUseCase) ValidateToken(ctx context.Context, token string) (*dto.TokenClaims, error) {
-	return uc.tokenService.ValidateToken(ctx, token)
+	claims, err := uc.tokenService.ValidateToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check token blacklist and session in Redis
+	if uc.cache != nil && claims.TokenID != "" {
+		blacklistKey := output.NewCacheKeyBuilder(cachePrefix).TokenBlacklist(claims.TokenID)
+		revoked, _ := uc.cache.Exists(ctx, blacklistKey)
+		if revoked {
+			return nil, domainerror.ErrInvalidToken
+		}
+
+		// Also verify the session still exists (handles bulk invalidation)
+		sessionKey := output.NewCacheKeyBuilder(cachePrefix).UserSession(claims.UserID.String(), claims.TokenID)
+		hasSession, _ := uc.cache.Exists(ctx, sessionKey)
+		if !hasSession {
+			return nil, domainerror.ErrInvalidToken
+		}
+	}
+
+	return claims, nil
+}
+
+// invalidateAllUserSessions revokes all active tokens for a user.
+func (uc *AuthUseCase) invalidateAllUserSessions(ctx context.Context, userID uuid.UUID) {
+	if uc.cache == nil {
+		return
+	}
+
+	// Delete all session keys for this user
+	sessionPattern := output.NewCacheKeyBuilder(cachePrefix).UserSessions(userID.String())
+	_ = uc.cache.DeletePattern(ctx, sessionPattern)
+
+	uc.logger.Info("invalidated all user sessions", "userId", userID)
+}
+
+// InvalidateAllUserSessions is a public hook for external use cases (e.g., role changes).
+func (uc *AuthUseCase) InvalidateAllUserSessions(ctx context.Context, userID uuid.UUID) {
+	uc.invalidateAllUserSessions(ctx, userID)
 }

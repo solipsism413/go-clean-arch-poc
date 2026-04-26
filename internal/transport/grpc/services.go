@@ -570,7 +570,8 @@ func (h *AuthServiceHandler) Logout(ctx context.Context, _ *emptypb.Empty) (*emp
 		return nil, err
 	}
 
-	if err := h.authService.Logout(ctx, claims.UserID); err != nil {
+	token := auth.GetTokenFromContext(ctx)
+	if err := h.authService.Logout(ctx, claims.UserID, token); err != nil {
 		return nil, toGRPCError(err)
 	}
 
@@ -740,6 +741,11 @@ func contextWithRequiredClaims(ctx context.Context, authService input.AuthServic
 	}
 
 	ctx = context.WithValue(ctx, auth.ClaimsContextKey, claims)
+	// Store raw token (without "Bearer " prefix) for revocation support
+	parts := strings.SplitN(strings.TrimSpace(authorization), " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+		ctx = context.WithValue(ctx, auth.TokenContextKey, parts[1])
+	}
 	return ctx, claims, nil
 }
 

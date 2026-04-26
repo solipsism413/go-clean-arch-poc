@@ -3,7 +3,12 @@ package task
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"log/slog"
+	"sort"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
@@ -15,6 +20,14 @@ import (
 	domainerror "github.com/handiism/go-clean-arch-poc/internal/domain/error"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/valueobject"
+)
+
+const (
+	cachePrefix = "app"
+
+	// Cache TTLs.
+	entityCacheTTL = 5 * time.Minute
+	listCacheTTL   = 2 * time.Minute
 )
 
 // Ensure TaskUseCase implements input.TaskService.
@@ -113,6 +126,9 @@ func (uc *TaskUseCase) CreateTask(ctx context.Context, input dto.CreateTaskInput
 		return nil, err
 	}
 
+	// Invalidate list caches
+	uc.invalidateTaskListCaches(ctx)
+
 	// Publish event
 	evt := event.NewTaskCreated(task.ID, task.Title, task.Description, task.Priority, task.CreatorID)
 	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
@@ -172,11 +188,8 @@ func (uc *TaskUseCase) UpdateTask(ctx context.Context, id uuid.UUID, input dto.U
 		return nil, err
 	}
 
-	// Invalidate cache
-	if uc.cache != nil {
-		cacheKey := output.NewCacheKeyBuilder("app").Task(id.String())
-		_ = uc.cache.Delete(ctx, cacheKey)
-	}
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, id)
 
 	// Publish event
 	evt := event.NewTaskUpdated(task.ID, getCreatorIDFromContext(ctx))
@@ -212,11 +225,8 @@ func (uc *TaskUseCase) DeleteTask(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 
-	// Invalidate cache
-	if uc.cache != nil {
-		cacheKey := output.NewCacheKeyBuilder("app").Task(id.String())
-		_ = uc.cache.Delete(ctx, cacheKey)
-	}
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, id)
 
 	// Publish event
 	evt := event.NewTaskDeleted(id, getCreatorIDFromContext(ctx))
@@ -229,8 +239,19 @@ func (uc *TaskUseCase) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// GetTask retrieves a task by ID.
+// GetTask retrieves a task by ID with cache-aside.
 func (uc *TaskUseCase) GetTask(ctx context.Context, id uuid.UUID) (*dto.TaskOutput, error) {
+	cacheKey := output.NewCacheKeyBuilder(cachePrefix).Task(id.String())
+
+	// Try cache first
+	if uc.cache != nil {
+		var cached dto.TaskOutput
+		if err := uc.cache.GetJSON(ctx, cacheKey, &cached); err == nil {
+			uc.logger.Debug("task cache hit", "taskId", id)
+			return &cached, nil
+		}
+	}
+
 	task, err := uc.taskRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -250,10 +271,15 @@ func (uc *TaskUseCase) GetTask(ctx context.Context, id uuid.UUID) (*dto.TaskOutp
 		}
 	}
 
+	// Store in cache
+	if uc.cache != nil {
+		_ = uc.cache.SetJSON(ctx, cacheKey, output, entityCacheTTL)
+	}
+
 	return output, nil
 }
 
-// ListTasks retrieves tasks with filtering and pagination.
+// ListTasks retrieves tasks with filtering and pagination with cache-aside.
 func (uc *TaskUseCase) ListTasks(ctx context.Context, filter dto.TaskFilter, pagination dto.Pagination) (*dto.TaskListOutput, error) {
 	// Validate input
 	if err := uc.validator.Validate(filter); err != nil {
@@ -288,6 +314,19 @@ func (uc *TaskUseCase) ListTasks(ctx context.Context, filter dto.TaskFilter, pag
 		SortDesc: pagination.SortDesc,
 	}
 
+	// Build cache key from filter + pagination hash
+	filterHash := uc.buildTaskListCacheKey(outputFilter, outputPagination)
+	cacheKey := output.NewCacheKeyBuilder(cachePrefix).TaskList(filterHash)
+
+	// Try cache first
+	if uc.cache != nil {
+		var cached dto.TaskListOutput
+		if err := uc.cache.GetJSON(ctx, cacheKey, &cached); err == nil {
+			uc.logger.Debug("task list cache hit", "filterHash", filterHash)
+			return &cached, nil
+		}
+	}
+
 	// Fetch tasks
 	tasks, paginatedResult, err := uc.taskRepo.FindAll(ctx, outputFilter, outputPagination)
 	if err != nil {
@@ -300,13 +339,20 @@ func (uc *TaskUseCase) ListTasks(ctx context.Context, filter dto.TaskFilter, pag
 		taskOutputs = append(taskOutputs, dto.TaskFromEntity(task))
 	}
 
-	return &dto.TaskListOutput{
+	result := &dto.TaskListOutput{
 		Tasks:      taskOutputs,
 		Total:      paginatedResult.Total,
 		Page:       paginatedResult.Page,
 		PageSize:   paginatedResult.PageSize,
 		TotalPages: paginatedResult.TotalPages,
-	}, nil
+	}
+
+	// Store in cache
+	if uc.cache != nil {
+		_ = uc.cache.SetJSON(ctx, cacheKey, result, listCacheTTL)
+	}
+
+	return result, nil
 }
 
 // AssignTask assigns a task to a user.
@@ -339,6 +385,9 @@ func (uc *TaskUseCase) AssignTask(ctx context.Context, taskID, assigneeID uuid.U
 		return nil, err
 	}
 
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, taskID)
+
 	// Publish event
 	evt := event.NewTaskAssigned(taskID, assigneeID, getCreatorIDFromContext(ctx))
 	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
@@ -370,6 +419,9 @@ func (uc *TaskUseCase) UnassignTask(ctx context.Context, taskID uuid.UUID) (*dto
 	if err := uc.taskRepo.Update(ctx, task); err != nil {
 		return nil, err
 	}
+
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, taskID)
 
 	// Publish event
 	if previousAssignee != nil {
@@ -413,6 +465,9 @@ func (uc *TaskUseCase) ChangeTaskStatus(ctx context.Context, taskID uuid.UUID, s
 		return nil, err
 	}
 
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, taskID)
+
 	// Publish event
 	evt := event.NewTaskStatusChanged(taskID, oldStatus, newStatus, getCreatorIDFromContext(ctx))
 	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
@@ -445,6 +500,9 @@ func (uc *TaskUseCase) CompleteTask(ctx context.Context, taskID uuid.UUID) (*dto
 		return nil, err
 	}
 
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, taskID)
+
 	// Publish event
 	evt := event.NewTaskCompleted(taskID, getCreatorIDFromContext(ctx))
 	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
@@ -476,6 +534,9 @@ func (uc *TaskUseCase) ArchiveTask(ctx context.Context, taskID uuid.UUID) (*dto.
 	if err := uc.taskRepo.Update(ctx, task); err != nil {
 		return nil, err
 	}
+
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, taskID)
 
 	// Publish event
 	evt := event.NewTaskArchived(taskID, getCreatorIDFromContext(ctx))
@@ -516,6 +577,9 @@ func (uc *TaskUseCase) AddLabel(ctx context.Context, taskID, labelID uuid.UUID) 
 		return nil, err
 	}
 
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, taskID)
+
 	// Publish event
 	evt := event.NewTaskLabelAdded(taskID, labelID, getCreatorIDFromContext(ctx))
 	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
@@ -543,6 +607,9 @@ func (uc *TaskUseCase) RemoveLabel(ctx context.Context, taskID, labelID uuid.UUI
 	if err := uc.taskRepo.Update(ctx, task); err != nil {
 		return nil, err
 	}
+
+	// Invalidate caches
+	uc.invalidateTaskCaches(ctx, taskID)
 
 	// Publish event
 	evt := event.NewTaskLabelRemoved(taskID, labelID, getCreatorIDFromContext(ctx))
@@ -611,6 +678,58 @@ func (uc *TaskUseCase) GetOverdueTasks(ctx context.Context, pagination dto.Pagin
 		PageSize:   paginatedResult.PageSize,
 		TotalPages: paginatedResult.TotalPages,
 	}, nil
+}
+
+// invalidateTaskCaches removes the task cache and all list caches.
+func (uc *TaskUseCase) invalidateTaskCaches(ctx context.Context, taskID uuid.UUID) {
+	if uc.cache == nil {
+		return
+	}
+	cacheKey := output.NewCacheKeyBuilder(cachePrefix).Task(taskID.String())
+	_ = uc.cache.Delete(ctx, cacheKey)
+	uc.invalidateTaskListCaches(ctx)
+}
+
+// invalidateTaskListCaches removes all task list caches.
+func (uc *TaskUseCase) invalidateTaskListCaches(ctx context.Context) {
+	if uc.cache == nil {
+		return
+	}
+	listPattern := output.NewCacheKeyBuilder(cachePrefix).TaskList("") + "*"
+	_ = uc.cache.DeletePattern(ctx, listPattern)
+}
+
+// buildTaskListCacheKey creates a deterministic hash from filter and pagination.
+func (uc *TaskUseCase) buildTaskListCacheKey(filter output.TaskFilter, pagination output.Pagination) string {
+	h := sha256.New()
+	fmt.Fprintf(h, "search=%s|", filter.Search)
+	if filter.AssigneeID != nil {
+		fmt.Fprintf(h, "assignee=%s|", filter.AssigneeID.String())
+	}
+	if filter.CreatorID != nil {
+		fmt.Fprintf(h, "creator=%s|", filter.CreatorID.String())
+	}
+	fmt.Fprintf(h, "overdue=%v|", filter.IsOverdue)
+	if len(filter.LabelIDs) > 0 {
+		// Sort for deterministic ordering
+		sorted := make([]uuid.UUID, len(filter.LabelIDs))
+		copy(sorted, filter.LabelIDs)
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].String() < sorted[j].String()
+		})
+		for _, id := range sorted {
+			fmt.Fprintf(h, "label=%s|", id.String())
+		}
+	}
+	if filter.Status != nil {
+		fmt.Fprintf(h, "status=%s|", *filter.Status)
+	}
+	if filter.Priority != nil {
+		fmt.Fprintf(h, "priority=%s|", *filter.Priority)
+	}
+	fmt.Fprintf(h, "page=%d|size=%d|sort=%s|desc=%v",
+		pagination.Page, pagination.PageSize, pagination.SortBy, pagination.SortDesc)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // getCreatorIDFromContext extracts the user ID from context.

@@ -3,6 +3,8 @@ package memory
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -240,6 +242,27 @@ func (c *MemoryCache) SetMultiple(ctx context.Context, values map[string][]byte,
 	}
 
 	return nil
+}
+
+// GetJSON retrieves and unmarshals a JSON value.
+func (c *MemoryCache) GetJSON(ctx context.Context, key string, dest any) error {
+	data, err := c.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	if data == nil {
+		return output.ErrCacheMiss
+	}
+	return json.Unmarshal(data, dest)
+}
+
+// SetJSON marshals and stores a value as JSON.
+func (c *MemoryCache) SetJSON(ctx context.Context, key string, value any, expiration time.Duration) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("json marshal failed: %w", err)
+	}
+	return c.Set(ctx, key, data, expiration)
 }
 
 // Close clears the cache.

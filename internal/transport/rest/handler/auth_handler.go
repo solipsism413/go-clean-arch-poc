@@ -7,6 +7,7 @@ import (
 
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
+	"github.com/handiism/go-clean-arch-poc/internal/auth"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/middleware"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest/presenter"
 )
@@ -129,7 +130,8 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authService.Logout(r.Context(), userID); err != nil {
+	token := auth.GetTokenFromContext(r.Context())
+	if err := h.authService.Logout(r.Context(), userID, token); err != nil {
 		handleError(w, err)
 		return
 	}

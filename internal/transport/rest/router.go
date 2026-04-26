@@ -154,8 +154,9 @@ func (r *Router) withAuth(h http.HandlerFunc) http.HandlerFunc {
 		// Add user info to context
 		ctx := customMiddleware.SetUserContext(req.Context(), claims)
 
-		// Add claims to context using auth package key for its middleware
+		// Add claims and raw token to context using auth package key for its middleware
 		ctx = context.WithValue(ctx, auth.ClaimsContextKey, claims)
+		ctx = context.WithValue(ctx, auth.TokenContextKey, token)
 
 		h(w, req.WithContext(ctx))
 	}

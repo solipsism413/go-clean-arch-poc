@@ -181,7 +181,7 @@ func (r *CacheRepository) GetJSON(ctx context.Context, key string, dest any) err
 		return err
 	}
 	if data == nil {
-		return redis.Nil
+		return output.ErrCacheMiss
 	}
 	return json.Unmarshal(data, dest)
 }

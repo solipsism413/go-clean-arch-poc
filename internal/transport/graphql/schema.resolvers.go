@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
+	"github.com/handiism/go-clean-arch-poc/internal/auth"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
 )
 
@@ -53,7 +54,8 @@ func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if err := r.authService.Logout(ctx, claims.UserID); err != nil {
+	token := auth.GetTokenFromContext(ctx)
+	if err := r.authService.Logout(ctx, claims.UserID, token); err != nil {
 		return false, err
 	}
 	return true, nil

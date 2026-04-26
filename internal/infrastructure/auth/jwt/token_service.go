@@ -125,8 +125,31 @@ func (s *TokenService) ValidateToken(ctx context.Context, tokenString string) (*
 		Roles:       claims.Roles,
 		RoleIDs:     claims.RoleIDs,
 		Permissions: claims.Permissions,
+		TokenID:     claims.ID,
 		ExpiresAt:   claims.ExpiresAt.Time,
 	}, nil
+}
+
+// ExtractTokenID extracts the JWT ID (jti) claim from a token without validating it.
+// WARNING: This parses the token without verifying its signature. It must only be called
+// with tokens that have already been validated or were generated internally.
+func (s *TokenService) ExtractTokenID(tokenString string) (string, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, &Claims{})
+	if err != nil {
+		return "", ErrInvalidToken
+	}
+
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return "", ErrInvalidToken
+	}
+
+	return claims.ID, nil
+}
+
+// RefreshTokenTTL returns the configured refresh token duration.
+func (s *TokenService) RefreshTokenTTL() time.Duration {
+	return s.refreshTokenTTL
 }
 
 // ValidateRefreshToken validates a refresh token and returns the user ID.

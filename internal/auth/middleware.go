@@ -23,6 +23,8 @@ const (
 	UserContextKey ContextKey = "user"
 	// ClaimsContextKey is the context key for JWT claims.
 	ClaimsContextKey ContextKey = "claims"
+	// TokenContextKey is the context key for the raw JWT token string.
+	TokenContextKey ContextKey = "token"
 )
 
 // Middleware provides authentication and authorization middleware.
@@ -68,8 +70,9 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add claims to context
+		// Add claims and raw token to context
 		ctx := context.WithValue(r.Context(), ClaimsContextKey, claims)
+		ctx = context.WithValue(ctx, TokenContextKey, token)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -99,6 +102,7 @@ func (m *Middleware) AuthenticateOptional(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), ClaimsContextKey, claims)
+		ctx = context.WithValue(ctx, TokenContextKey, token)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -209,6 +213,15 @@ func GetClaimsFromContext(ctx context.Context) *dto.TokenClaims {
 		return nil
 	}
 	return claims
+}
+
+// GetTokenFromContext retrieves the raw JWT token string from context.
+func GetTokenFromContext(ctx context.Context) string {
+	token, ok := ctx.Value(TokenContextKey).(string)
+	if !ok {
+		return ""
+	}
+	return token
 }
 
 // GetUserFromContext retrieves the authenticated user from context.

@@ -228,6 +228,16 @@ func (m *MockCacheRepository) SetMultiple(ctx context.Context, values map[string
 	return args.Error(0)
 }
 
+func (m *MockCacheRepository) GetJSON(ctx context.Context, key string, dest any) error {
+	args := m.Called(ctx, key, dest)
+	return args.Error(0)
+}
+
+func (m *MockCacheRepository) SetJSON(ctx context.Context, key string, value any, expiration time.Duration) error {
+	args := m.Called(ctx, key, value, expiration)
+	return args.Error(0)
+}
+
 // MockEventPublisher is a mock implementation of the EventPublisher interface.
 type MockEventPublisher struct {
 	mock.Mock
@@ -426,6 +436,8 @@ func TestUserUseCase_CreateUser(t *testing.T) {
 		mockUserRepo.On("ExistsByEmail", ctx, input.Email).Return(false, nil)
 		mockUserRepo.On("Save", ctx, mock.AnythingOfType("*entity.User")).Return(nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("Delete", ctx, mock.AnythingOfType("string")).Return(nil)
+		mockCache.On("DeletePattern", ctx, mock.AnythingOfType("string")).Return(nil)
 
 		result, err := uc.CreateUser(ctx, input)
 
@@ -438,6 +450,7 @@ func TestUserUseCase_CreateUser(t *testing.T) {
 		mockValidator.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 		mockEventPublisher.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("validation error", func(t *testing.T) {
@@ -559,6 +572,8 @@ func TestUserUseCase_UpdateUser(t *testing.T) {
 		mockUserRepo.On("ExistsByEmail", ctx, newEmail).Return(false, nil)
 		mockUserRepo.On("Update", ctx, mock.AnythingOfType("*entity.User")).Return(nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("Delete", ctx, mock.AnythingOfType("string")).Return(nil)
+		mockCache.On("DeletePattern", ctx, mock.AnythingOfType("string")).Return(nil)
 
 		result, err := uc.UpdateUser(ctx, userID, input)
 
@@ -570,6 +585,7 @@ func TestUserUseCase_UpdateUser(t *testing.T) {
 		mockValidator.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 		mockEventPublisher.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -648,9 +664,14 @@ func TestUserUseCase_DeleteUser(t *testing.T) {
 
 		uc := setupTestUserUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, mockValidator)
 
-		mockUserRepo.On("ExistsByID", ctx, userID).Return(true, nil)
+		testUser, _ := entity.NewUser("delete@example.com", "password", "Delete User")
+		testUser.ID = userID
+
+		mockUserRepo.On("FindByID", ctx, userID).Return(testUser, nil)
 		mockUserRepo.On("Delete", ctx, userID).Return(nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("Delete", ctx, mock.AnythingOfType("string")).Return(nil)
+		mockCache.On("DeletePattern", ctx, mock.AnythingOfType("string")).Return(nil)
 
 		err := uc.DeleteUser(ctx, userID)
 
@@ -658,6 +679,7 @@ func TestUserUseCase_DeleteUser(t *testing.T) {
 
 		mockUserRepo.AssertExpectations(t)
 		mockEventPublisher.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -670,7 +692,7 @@ func TestUserUseCase_DeleteUser(t *testing.T) {
 
 		uc := setupTestUserUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, mockValidator)
 
-		mockUserRepo.On("ExistsByID", ctx, userID).Return(false, nil)
+		mockUserRepo.On("FindByID", ctx, userID).Return(nil, nil)
 
 		err := uc.DeleteUser(ctx, userID)
 
@@ -699,7 +721,9 @@ func TestUserUseCase_GetUser(t *testing.T) {
 		testUser, _ := entity.NewUser("test@example.com", "password", "Test User")
 		testUser.ID = userID
 
+		mockCache.On("GetJSON", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errors.New("cache miss"))
 		mockUserRepo.On("FindByID", ctx, userID).Return(testUser, nil)
+		mockCache.On("SetJSON", ctx, mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("time.Duration")).Return(nil)
 
 		result, err := uc.GetUser(ctx, userID)
 
@@ -722,6 +746,7 @@ func TestUserUseCase_GetUser(t *testing.T) {
 
 		uc := setupTestUserUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, mockValidator)
 
+		mockCache.On("GetJSON", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errors.New("cache miss"))
 		mockUserRepo.On("FindByID", ctx, userID).Return(nil, nil)
 
 		result, err := uc.GetUser(ctx, userID)
@@ -751,7 +776,9 @@ func TestUserUseCase_GetUserByEmail(t *testing.T) {
 
 		testUser, _ := entity.NewUser(email, "password", "Test User")
 
+		mockCache.On("GetJSON", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errors.New("cache miss"))
 		mockUserRepo.On("FindByEmail", ctx, email).Return(testUser, nil)
+		mockCache.On("SetJSON", ctx, mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("time.Duration")).Return(nil)
 
 		result, err := uc.GetUserByEmail(ctx, email)
 
@@ -772,6 +799,7 @@ func TestUserUseCase_GetUserByEmail(t *testing.T) {
 
 		uc := setupTestUserUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, mockValidator)
 
+		mockCache.On("GetJSON", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errors.New("cache miss"))
 		mockUserRepo.On("FindByEmail", ctx, email).Return(nil, nil)
 
 		result, err := uc.GetUserByEmail(ctx, email)
@@ -814,8 +842,10 @@ func TestUserUseCase_ListUsers(t *testing.T) {
 
 		mockValidator.On("Validate", filter).Return(nil)
 		mockValidator.On("Validate", pagination).Return(nil)
+		mockCache.On("GetJSON", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errors.New("cache miss"))
 		mockUserRepo.On("FindAll", ctx, mock.AnythingOfType("output.UserFilter"), mock.AnythingOfType("output.Pagination")).
 			Return(users, paginatedResult, nil)
+		mockCache.On("SetJSON", ctx, mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("time.Duration")).Return(nil)
 
 		result, err := uc.ListUsers(ctx, filter, pagination)
 
@@ -880,6 +910,8 @@ func TestUserUseCase_AssignRole(t *testing.T) {
 		mockRoleRepo.On("FindByID", ctx, roleID).Return(testRole, nil)
 		mockUserRepo.On("Update", ctx, mock.AnythingOfType("*entity.User")).Return(nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("Delete", ctx, mock.AnythingOfType("string")).Return(nil)
+		mockCache.On("DeletePattern", ctx, mock.AnythingOfType("string")).Return(nil)
 
 		result, err := uc.AssignRole(ctx, userID, roleID)
 
@@ -891,6 +923,7 @@ func TestUserUseCase_AssignRole(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 		mockRoleRepo.AssertExpectations(t)
 		mockEventPublisher.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -967,6 +1000,8 @@ func TestUserUseCase_RemoveRole(t *testing.T) {
 		mockRoleRepo.On("FindByID", ctx, roleID).Return(testRole, nil)
 		mockUserRepo.On("Update", ctx, mock.AnythingOfType("*entity.User")).Return(nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("Delete", ctx, mock.AnythingOfType("string")).Return(nil)
+		mockCache.On("DeletePattern", ctx, mock.AnythingOfType("string")).Return(nil)
 
 		result, err := uc.RemoveRole(ctx, userID, roleID)
 
@@ -977,6 +1012,7 @@ func TestUserUseCase_RemoveRole(t *testing.T) {
 		mockUserRepo.AssertExpectations(t)
 		mockRoleRepo.AssertExpectations(t)
 		mockEventPublisher.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 }
 

@@ -230,6 +230,16 @@ func (m *MockCacheRepository) SetMultiple(ctx context.Context, values map[string
 	return args.Error(0)
 }
 
+func (m *MockCacheRepository) GetJSON(ctx context.Context, key string, dest any) error {
+	args := m.Called(ctx, key, dest)
+	return args.Error(0)
+}
+
+func (m *MockCacheRepository) SetJSON(ctx context.Context, key string, value any, expiration time.Duration) error {
+	args := m.Called(ctx, key, value, expiration)
+	return args.Error(0)
+}
+
 // MockEventPublisher is a mock implementation of the EventPublisher interface.
 type MockEventPublisher struct {
 	mock.Mock
@@ -470,6 +480,7 @@ func TestAuthUseCase_Register(t *testing.T) {
 		mockRoleRepo.On("FindByName", ctx, entity.RoleMember).Return(memberRole, nil)
 		mockUserRepo.On("Save", ctx, mock.AnythingOfType("*entity.User")).Return(nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("SetJSON", ctx, mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("time.Duration")).Return(nil)
 
 		result, err := uc.Register(ctx, input)
 
@@ -577,6 +588,7 @@ func TestAuthUseCase_Login(t *testing.T) {
 		mockValidator.On("Validate", input).Return(nil)
 		mockUserRepo.On("FindByEmail", ctx, input.Email).Return(testUser, nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("SetJSON", ctx, mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("time.Duration")).Return(nil)
 
 		result, err := uc.Login(ctx, input)
 
@@ -728,22 +740,27 @@ func TestAuthUseCase_Logout(t *testing.T) {
 
 		uc := setupTestAuthUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, tokenService, mockValidator)
 
-		testUser, err := entity.NewUser("test@example.com", "password123", "Test User")
+		// Generate a valid token to pass to Logout
+		roles := []string{"admin"}
+		roleIDs := []uuid.UUID{uuid.New()}
+		permissions := []string{"task:read"}
+		authOutput, err := tokenService.GenerateTokenPair(ctx, userID, "test@example.com", roles, roleIDs, permissions)
 		assert.NoError(t, err)
-		testUser.ID = userID
 
-		mockUserRepo.On("FindByID", ctx, userID).Return(testUser, nil)
+		mockCache.On("Set", mock.Anything, mock.Anything, []byte("revoked"), mock.Anything).Return(nil).Once()
+		mockCache.On("GetJSON", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockCache.On("Delete", mock.Anything, mock.Anything).Return(nil).Once()
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
 
-		err = uc.Logout(ctx, userID)
+		err = uc.Logout(ctx, userID, authOutput.AccessToken)
 
 		assert.NoError(t, err)
 
-		mockUserRepo.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 		mockEventPublisher.AssertExpectations(t)
 	})
 
-	t.Run("user not found", func(t *testing.T) {
+	t.Run("invalid token", func(t *testing.T) {
 		mockUserRepo := new(MockUserRepository)
 		mockRoleRepo := new(MockRoleRepository)
 		mockCache := new(MockCacheRepository)
@@ -754,36 +771,9 @@ func TestAuthUseCase_Logout(t *testing.T) {
 
 		uc := setupTestAuthUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, tokenService, mockValidator)
 
-		mockUserRepo.On("FindByID", ctx, userID).Return(nil, nil)
-
-		err := uc.Logout(ctx, userID)
+		err := uc.Logout(ctx, userID, "invalid-token")
 
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, domainerror.ErrUserNotFound)
-
-		mockUserRepo.AssertExpectations(t)
-	})
-
-	t.Run("repository error", func(t *testing.T) {
-		mockUserRepo := new(MockUserRepository)
-		mockRoleRepo := new(MockRoleRepository)
-		mockCache := new(MockCacheRepository)
-		mockEventPublisher := new(MockEventPublisher)
-		mockTM := new(MockTransactionManager)
-		tokenService := createTestTokenService()
-		mockValidator := new(MockValidator)
-
-		uc := setupTestAuthUseCase(mockUserRepo, mockRoleRepo, mockCache, mockEventPublisher, mockTM, tokenService, mockValidator)
-
-		repoErr := errors.New("database error")
-		mockUserRepo.On("FindByID", ctx, userID).Return(nil, repoErr)
-
-		err := uc.Logout(ctx, userID)
-
-		assert.Error(t, err)
-		assert.Equal(t, repoErr, err)
-
-		mockUserRepo.AssertExpectations(t)
 	})
 }
 
@@ -815,6 +805,10 @@ func TestAuthUseCase_RefreshToken(t *testing.T) {
 		refreshToken := authOutput.RefreshToken
 
 		mockUserRepo.On("FindByID", ctx, userID).Return(testUser, nil)
+		mockCache.On("Exists", mock.Anything, mock.Anything).Return(false, nil).Once()
+		mockCache.On("Exists", mock.Anything, mock.Anything).Return(true, nil).Once()
+		mockCache.On("SetJSON", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockCache.On("SetJSON", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		result, err := uc.RefreshToken(ctx, refreshToken)
 
@@ -825,6 +819,7 @@ func TestAuthUseCase_RefreshToken(t *testing.T) {
 		assert.NotNil(t, result.User)
 
 		mockUserRepo.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("invalid refresh token", func(t *testing.T) {
@@ -871,6 +866,8 @@ func TestAuthUseCase_RefreshToken(t *testing.T) {
 		assert.NoError(t, err)
 		refreshToken := authOutput.RefreshToken
 
+		mockCache.On("Exists", mock.Anything, mock.Anything).Return(false, nil).Once()
+		mockCache.On("Exists", mock.Anything, mock.Anything).Return(true, nil).Once()
 		// Mock the repo to return nil (user not found)
 		mockUserRepo.On("FindByID", ctx, userID).Return(nil, nil)
 
@@ -881,6 +878,7 @@ func TestAuthUseCase_RefreshToken(t *testing.T) {
 		assert.ErrorIs(t, err, domainerror.ErrUserNotFound)
 
 		mockUserRepo.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 }
 
@@ -913,6 +911,7 @@ func TestAuthUseCase_ChangePassword(t *testing.T) {
 		mockUserRepo.On("FindByID", ctx, userID).Return(testUser, nil)
 		mockUserRepo.On("Update", ctx, mock.AnythingOfType("*entity.User")).Return(nil)
 		mockEventPublisher.On("Publish", ctx, output.TopicUserEvents, mock.Anything).Return(nil)
+		mockCache.On("DeletePattern", ctx, mock.AnythingOfType("string")).Return(nil)
 
 		err = uc.ChangePassword(ctx, userID, input)
 
@@ -921,6 +920,7 @@ func TestAuthUseCase_ChangePassword(t *testing.T) {
 		mockValidator.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 		mockEventPublisher.AssertExpectations(t)
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("validation error", func(t *testing.T) {
@@ -1070,12 +1070,17 @@ func TestAuthUseCase_ValidateToken(t *testing.T) {
 		authOutput, err := tokenService.GenerateTokenPair(ctx, testUser.ID, testUser.Email, roles, roleIDs, permissions)
 		assert.NoError(t, err)
 
+		mockCache.On("Exists", mock.Anything, mock.Anything).Return(false, nil).Once()
+		mockCache.On("Exists", mock.Anything, mock.Anything).Return(true, nil).Once()
+
 		result, err := uc.ValidateToken(ctx, authOutput.AccessToken)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, testUser.ID, result.UserID)
 		assert.Equal(t, testUser.Email, result.Email)
+
+		mockCache.AssertExpectations(t)
 	})
 
 	t.Run("invalid token", func(t *testing.T) {

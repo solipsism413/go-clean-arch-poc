@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -274,7 +276,8 @@ func (m *mockCacheRepository) Delete(ctx context.Context, key string) error {
 }
 
 func (m *mockCacheRepository) Exists(ctx context.Context, key string) (bool, error) {
-	return false, nil
+	// In integration tests, treat blacklist keys as "not revoked" and session keys as "exists"
+	return !strings.Contains(key, ":token:blacklist:"), nil
 }
 
 func (m *mockCacheRepository) SetNX(ctx context.Context, key string, value []byte, expiration time.Duration) (bool, error) {
@@ -298,6 +301,14 @@ func (m *mockCacheRepository) GetMultiple(ctx context.Context, keys []string) (m
 }
 
 func (m *mockCacheRepository) SetMultiple(ctx context.Context, values map[string][]byte, expiration time.Duration) error {
+	return nil
+}
+
+func (m *mockCacheRepository) GetJSON(ctx context.Context, key string, dest any) error {
+	return errors.New("cache miss")
+}
+
+func (m *mockCacheRepository) SetJSON(ctx context.Context, key string, value any, expiration time.Duration) error {
 	return nil
 }
 

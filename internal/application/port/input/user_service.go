@@ -46,7 +46,7 @@ type AuthService interface {
 	Login(ctx context.Context, input dto.LoginInput) (*dto.AuthOutput, error)
 
 	// Logout invalidates the user's session/tokens.
-	Logout(ctx context.Context, userID uuid.UUID) error
+	Logout(ctx context.Context, userID uuid.UUID, accessToken string) error
 
 	// RefreshToken refreshes the access token.
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.AuthOutput, error)
