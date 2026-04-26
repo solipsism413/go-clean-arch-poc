@@ -44,12 +44,6 @@ temp/
 # Docker
 docker-compose.override.yml
 
-# Generated files
-docs/swagger.json
-docs/swagger.yaml
-docs/docs.go
-
-# SQLC generated files
-internal/infrastructure/database/sqlc/*.sql.go
-internal/infrastructure/database/sqlc/db.go
-internal/infrastructure/database/sqlc/models.go
+# NOTE: Generated Go code (SQLC, Swagger, gRPC, GraphQL) is committed so that
+# `go build` works without requiring codegen toolchains. Run `make generate`
+# before committing to keep generated artifacts in sync with their sources.
