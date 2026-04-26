@@ -166,6 +166,30 @@ func (r *mutationResolver) ChangeTaskStatus(ctx context.Context, id uuid.UUID, s
 	return r.enrichAndMapTask(ctx, task)
 }
 
+// CompleteTask is the resolver for the completeTask field.
+func (r *mutationResolver) CompleteTask(ctx context.Context, id uuid.UUID) (*Task, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	task, err := r.taskService.CompleteTask(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return r.enrichAndMapTask(ctx, task)
+}
+
+// ArchiveTask is the resolver for the archiveTask field.
+func (r *mutationResolver) ArchiveTask(ctx context.Context, id uuid.UUID) (*Task, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	task, err := r.taskService.ArchiveTask(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return r.enrichAndMapTask(ctx, task)
+}
+
 // AddLabelToTask is the resolver for the addLabelToTask field.
 func (r *mutationResolver) AddLabelToTask(ctx context.Context, taskID uuid.UUID, labelID uuid.UUID) (*Task, error) {
 	if _, err := requireAuth(ctx); err != nil {
@@ -385,6 +409,42 @@ func (r *queryResolver) Tasks(ctx context.Context, filter *TaskFilter, paginatio
 	}, nil
 }
 
+// OverdueTasks is the resolver for the overdueTasks field.
+func (r *queryResolver) OverdueTasks(ctx context.Context, pagination *PaginationInput) (*TaskConnection, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+
+	list, err := r.taskService.GetOverdueTasks(ctx, paginationFromInput(pagination))
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]*Task, 0, len(list.Tasks))
+	for _, t := range list.Tasks {
+		task, err := r.enrichAndMapTask(ctx, t)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	edges := make([]*TaskEdge, 0, len(tasks))
+	for i, task := range tasks {
+		cursor := encodeCursor(i + 1 + (list.Page-1)*list.PageSize)
+		edges = append(edges, &TaskEdge{
+			Node:   task,
+			Cursor: cursor,
+		})
+	}
+
+	return &TaskConnection{
+		Edges:      edges,
+		PageInfo:   pageInfoFromPagination(list.Page, list.PageSize, list.TotalPages, int(list.Total)),
+		TotalCount: int(list.Total),
+	}, nil
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*User, error) {
 	claims, err := requireAuth(ctx)
@@ -458,6 +518,18 @@ func (r *queryResolver) Role(ctx context.Context, id uuid.UUID) (*Role, error) {
 		return nil, err
 	}
 	return roleToGraphQL(role), nil
+}
+
+// Label is the resolver for the label field.
+func (r *queryResolver) Label(ctx context.Context, id uuid.UUID) (*Label, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	label, err := r.labelService.GetLabel(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return labelToGraphQL(label), nil
 }
 
 // Labels is the resolver for the labels field.

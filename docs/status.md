@@ -26,10 +26,11 @@ This file is the single operational view for implementation progress, current pr
 - [x] Expose GraphQL over HTTP using the existing schema.
 - [x] Expand Redis usage into token revocation, session invalidation, and read caching.
 - [x] Add stronger observability around attachment cleanup retries and storage failures.
+- [x] Improve GraphQL parity with REST and gRPC for task lifecycle, overdue task queries, and label lookup.
 
 ## Next
 
-- [ ] Improve capability parity across REST, GraphQL, gRPC, and realtime transports.
+- [ ] Close remaining transport parity gaps such as task attachments and GraphQL or realtime subscription coverage.
 
 ## Later
 
@@ -39,6 +40,8 @@ This file is the single operational view for implementation progress, current pr
 
 - GraphQL HTTP endpoint is now available at `/graphql` with a Playground at `/graphql/playground`.
   Reference: `internal/transport/graphql/`, `cmd/server/main.go`
+- GraphQL now covers task completion, task archiving, overdue task queries, and single-label lookup in addition to its existing CRUD surface.
+  Reference: `internal/transport/graphql/schema.graphqls`, `internal/transport/graphql/schema.resolvers.go`
 - gRPC services are fully implemented and registered for task, user, auth, and label operations.
   Reference: `cmd/grpc/main.go`, `internal/transport/grpc/services.go`
 - Task attachment workflows are available over REST and store blobs in S3 or MinIO.
@@ -52,4 +55,4 @@ This file is the single operational view for implementation progress, current pr
 
 - Working today: REST API, GraphQL HTTP endpoint, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
 - Partial today: attachment cleanup retries depend on Kafka-backed background consumers.
-- Main gap today: transport capability parity and richer operational metrics beyond the current structured logging and core REST, GraphQL, and gRPC surfaces.
+- Main gap today: attachment and subscription parity across transports, plus richer operational metrics beyond the current structured logging and core REST, GraphQL, and gRPC surfaces.

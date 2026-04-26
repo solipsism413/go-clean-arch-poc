@@ -7,6 +7,7 @@ type Query {
   # Task queries
   task(id: UUID!): Task
   tasks(filter: TaskFilter, pagination: PaginationInput): TaskConnection!
+  overdueTasks(pagination: PaginationInput): TaskConnection!
 
   # User queries
   me: User!
@@ -18,6 +19,7 @@ type Query {
   role(id: UUID!): Role
 
   # Label queries
+  label(id: UUID!): Label
   labels: [Label!]!
 }
 
@@ -35,6 +37,8 @@ type Mutation {
   assignTask(id: UUID!, assigneeId: UUID!): Task!
   unassignTask(id: UUID!): Task!
   changeTaskStatus(id: UUID!, status: TaskStatus!): Task!
+  completeTask(id: UUID!): Task!
+  archiveTask(id: UUID!): Task!
   addLabelToTask(taskId: UUID!, labelId: UUID!): Task!
   removeLabelFromTask(taskId: UUID!, labelId: UUID!): Task!
 
