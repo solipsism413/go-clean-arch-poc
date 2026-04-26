@@ -8,28 +8,13 @@ import (
 
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/application/usecase/task"
+	"github.com/handiism/go-clean-arch-poc/internal/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
-
-// MockValidator is a mock implementation of the Validator interface.
-type MockValidator struct {
-	mock.Mock
-}
-
-func (m *MockValidator) Validate(data any) error {
-	args := m.Called(data)
-	return args.Error(0)
-}
-
-func (m *MockValidator) ValidateVar(field any, tag string) error {
-	args := m.Called(field, tag)
-	return args.Error(0)
-}
 
 func TestTaskUseCase_CreateTask_Validation(t *testing.T) {
 	// Simple test to verify that the mock validator is called
-	mockValidator := new(MockValidator)
+	mockValidator := new(mocks.MockValidator)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// We don't need real repos for this validation check

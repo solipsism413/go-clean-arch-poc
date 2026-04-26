@@ -132,8 +132,14 @@ generate-swagger:
 	@echo "Generating Swagger documentation..."
 	swag init -g cmd/server/main.go -o docs/api/swagger
 
+# Generate mocks with mockery
+generate-mocks:
+	@echo "Generating mocks with mockery..."
+	rm -rf internal/mocks
+	mockery
+
 # Generate all code
-generate: generate-sqlc generate-swagger
+generate: generate-sqlc generate-swagger generate-mocks
 	@echo "Code generation complete!"
 
 # Run linter
@@ -157,6 +163,7 @@ install-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	go install github.com/vektra/mockery/v3@latest
 
 # Full setup for new developers
 setup: install-tools docker-up migrate-up generate

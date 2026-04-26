@@ -26,13 +26,14 @@ import (
 	"github.com/handiism/go-clean-arch-poc/internal/auth/acl"
 	"github.com/handiism/go-clean-arch-poc/internal/auth/rbac"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
-	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/auth/jwt"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/repository"
+	"github.com/handiism/go-clean-arch-poc/internal/mocks"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/rest"
 	"github.com/handiism/go-clean-arch-poc/pkg/config"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -107,9 +108,31 @@ func SetupTestApp(t *testing.T) *TestApp {
 	// Create transaction manager
 	tm := postgres.NewTransactionManager(pool)
 
-	// Create mock cache and event publisher
-	cache := &mockCacheRepository{}
-	eventPublisher := &mockEventPublisher{}
+	// Create mock cache and event publisher using mockery-generated mocks
+	cache := new(mocks.MockCacheRepository)
+	eventPublisher := new(mocks.MockEventPublisher)
+
+	// Set up default cache expectations for integration tests
+	cache.On("Get", mock.Anything, mock.Anything).Return(nil, nil)
+	cache.On("Set", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cache.On("Delete", mock.Anything, mock.Anything).Return(nil)
+	cache.On("Exists", mock.Anything, mock.Anything).Return(func(ctx context.Context, key string) (bool, error) {
+		// Treat blacklist keys as "not revoked"; everything else as existing
+		return !strings.Contains(key, ":token:blacklist:"), nil
+	})
+	cache.On("SetNX", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	cache.On("Expire", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cache.On("Increment", mock.Anything, mock.Anything, mock.Anything).Return(int64(0), nil)
+	cache.On("DeletePattern", mock.Anything, mock.Anything).Return(nil)
+	cache.On("GetMultiple", mock.Anything, mock.Anything).Return(nil, nil)
+	cache.On("SetMultiple", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cache.On("GetJSON", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("cache miss"))
+	cache.On("SetJSON", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	// Set up default event publisher expectations
+	eventPublisher.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	eventPublisher.On("PublishBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	eventPublisher.On("Close").Return(nil)
 
 	// Create validator
 	validator := validation.NewValidator()
@@ -257,71 +280,4 @@ func findMigrationsPath() string {
 	}
 
 	panic("migrations directory not found")
-}
-
-// Mock implementations
-
-type mockCacheRepository struct{}
-
-func (m *mockCacheRepository) Get(ctx context.Context, key string) ([]byte, error) {
-	return nil, nil
-}
-
-func (m *mockCacheRepository) Set(ctx context.Context, key string, value []byte, expiration time.Duration) error {
-	return nil
-}
-
-func (m *mockCacheRepository) Delete(ctx context.Context, key string) error {
-	return nil
-}
-
-func (m *mockCacheRepository) Exists(ctx context.Context, key string) (bool, error) {
-	// In integration tests, treat blacklist keys as "not revoked" and session keys as "exists"
-	return !strings.Contains(key, ":token:blacklist:"), nil
-}
-
-func (m *mockCacheRepository) SetNX(ctx context.Context, key string, value []byte, expiration time.Duration) (bool, error) {
-	return true, nil
-}
-
-func (m *mockCacheRepository) Expire(ctx context.Context, key string, expiration time.Duration) error {
-	return nil
-}
-
-func (m *mockCacheRepository) Increment(ctx context.Context, key string, value int64) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockCacheRepository) DeletePattern(ctx context.Context, pattern string) error {
-	return nil
-}
-
-func (m *mockCacheRepository) GetMultiple(ctx context.Context, keys []string) (map[string][]byte, error) {
-	return nil, nil
-}
-
-func (m *mockCacheRepository) SetMultiple(ctx context.Context, values map[string][]byte, expiration time.Duration) error {
-	return nil
-}
-
-func (m *mockCacheRepository) GetJSON(ctx context.Context, key string, dest any) error {
-	return errors.New("cache miss")
-}
-
-func (m *mockCacheRepository) SetJSON(ctx context.Context, key string, value any, expiration time.Duration) error {
-	return nil
-}
-
-type mockEventPublisher struct{}
-
-func (m *mockEventPublisher) Publish(ctx context.Context, topic string, evt event.Event) error {
-	return nil
-}
-
-func (m *mockEventPublisher) PublishBatch(ctx context.Context, topic string, events []event.Event) error {
-	return nil
-}
-
-func (m *mockEventPublisher) Close() error {
-	return nil
 }

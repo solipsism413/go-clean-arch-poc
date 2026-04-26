@@ -26,11 +26,16 @@ jobs:
         run: |
           go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
           go install github.com/swaggo/swag/cmd/swag@latest
+          go install github.com/vektra/mockery/v3@latest
 
       - name: Run code generation
         run: |
           sqlc generate
-          swag init -g cmd/server/main.go -o docs
+          swag init -g cmd/server/main.go -o docs/api/swagger
+          mockery
+
+      - name: Verify generated code is up to date
+        run: git diff --exit-code
 
       - name: Run go vet
         run: go vet ./...
@@ -83,11 +88,13 @@ jobs:
         run: |
           go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
           go install github.com/swaggo/swag/cmd/swag@latest
+          go install github.com/vektra/mockery/v3@latest
 
       - name: Run code generation
         run: |
           sqlc generate
-          swag init -g cmd/server/main.go -o docs
+          swag init -g cmd/server/main.go -o docs/api/swagger
+          mockery
 
       - name: Download dependencies
         run: go mod download
@@ -135,11 +142,13 @@ jobs:
         run: |
           go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
           go install github.com/swaggo/swag/cmd/swag@latest
+          go install github.com/vektra/mockery/v3@latest
 
       - name: Run code generation
         run: |
           sqlc generate
-          swag init -g cmd/server/main.go -o docs
+          swag init -g cmd/server/main.go -o docs/api/swagger
+          mockery
 
       - name: Build ${{ matrix.name }}
         run: |
