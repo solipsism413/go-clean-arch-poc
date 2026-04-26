@@ -16,7 +16,6 @@ import (
 	userUseCase "github.com/handiism/go-clean-arch-poc/internal/application/usecase/user"
 	"github.com/handiism/go-clean-arch-poc/internal/application/validation"
 	"github.com/handiism/go-clean-arch-poc/internal/application/worker"
-	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/auth/jwt"
 	redisCache "github.com/handiism/go-clean-arch-poc/internal/infrastructure/cache/redis"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
@@ -119,20 +118,7 @@ func main() {
 	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
 
 	eventConsumer := worker.NewEventConsumer(log)
-	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", func(ctx context.Context, evt event.Event) error {
-		cleanupEvent, ok := evt.(*event.TaskAttachmentCleanupRequested)
-		if !ok {
-			return fmt.Errorf("unexpected event type %T", evt)
-		}
-		if fileStorage == nil {
-			return fmt.Errorf("file storage unavailable for cleanup retry")
-		}
-		if err := fileStorage.Delete(ctx, cleanupEvent.ObjectKey); err != nil {
-			return err
-		}
-		log.Info("background handler: attachment cleanup completed", "taskID", cleanupEvent.AggregateID(), "attachmentId", cleanupEvent.AttachmentID)
-		return nil
-	})
+	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", worker.NewTaskAttachmentCleanupHandler(fileStorage, log))
 
 	if eventSubscriber != nil {
 		if err := eventConsumer.Start(ctx, eventSubscriber, []string{output.TopicTaskEvents, output.TopicUserEvents}); err != nil {

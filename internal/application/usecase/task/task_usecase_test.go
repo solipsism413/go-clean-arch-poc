@@ -131,3 +131,26 @@ func TestTaskUseCase_DeleteTaskAttachment_RequiresCleanupChannelWhenBlobDeletion
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "attachment cleanup is unavailable")
 }
+
+func TestTaskUseCase_UploadTaskAttachment_QueuesCleanupWhenSaveFailsAndRollbackFails(t *testing.T) {
+	taskRepo := mocks.NewMockTaskRepository(t)
+	attachmentRepo := mocks.NewMockTaskAttachmentRepository(t)
+	fileStorage := mocks.NewMockFileStorage(t)
+	eventPublisher := mocks.NewMockEventPublisher(t)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	taskID := uuid.New()
+	taskRepo.EXPECT().ExistsByID(mock.Anything, taskID).Return(true, nil).Once()
+	fileStorage.EXPECT().Upload(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&output.FileMetadata{Key: "attachments/tasks/x/file", Size: 5}, nil).Once()
+	attachmentRepo.EXPECT().SaveAttachment(mock.Anything, mock.Anything).Return(errors.New("insert failed")).Once()
+	fileStorage.EXPECT().Delete(mock.Anything, "attachments/tasks/x/file").Return(errors.New("s3 down")).Once()
+	eventPublisher.EXPECT().Publish(mock.Anything, output.TopicTaskEvents, mock.MatchedBy(func(evt event.Event) bool {
+		return evt.EventType() == "task.attachment_cleanup_requested"
+	})).Return(nil).Once()
+
+	uc := task.NewTaskUseCase(taskRepo, attachmentRepo, nil, nil, fileStorage, nil, eventPublisher, nil, nil, logger)
+
+	_, err := uc.UploadTaskAttachment(context.Background(), taskID, "report.pdf", "application/pdf", strings.NewReader("hello"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to save attachment")
+}

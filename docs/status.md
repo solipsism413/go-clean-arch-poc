@@ -25,14 +25,15 @@ This file is the single operational view for implementation progress, current pr
 - [x] Add background consumers or subscribers for published domain events.
 - [x] Expose GraphQL over HTTP using the existing schema.
 - [x] Expand Redis usage into token revocation, session invalidation, and read caching.
+- [x] Add stronger observability around attachment cleanup retries and storage failures.
 
 ## Next
 
-- [ ] Add stronger observability around attachment cleanup retries and storage failures.
+- [ ] Improve capability parity across REST, GraphQL, gRPC, and realtime transports.
 
 ## Later
 
-- [ ] Improve capability parity across REST, GraphQL, gRPC, and realtime transports.
+- [ ] Add richer operational metrics and alerting beyond structured logging for background workflows.
 
 ## Notes
 
@@ -44,9 +45,11 @@ This file is the single operational view for implementation progress, current pr
   Reference: `internal/transport/rest/handler/task_handler.go`, `internal/application/usecase/task/task_usecase.go`
 - Attachment uploads enforce a 32 MiB request limit, and failed blob deletions publish retry events for background cleanup.
   Reference: `internal/transport/rest/handler/task_handler.go`, `internal/domain/event/task_events.go`, `cmd/server/main.go`, `cmd/grpc/main.go`
+- Attachment cleanup retries and upload rollback failures now emit structured logs with task, attachment, object-key, and retry context in both HTTP and gRPC startup paths.
+  Reference: `internal/application/usecase/task/task_usecase.go`, `internal/application/worker/task_attachment_cleanup_handler.go`, `cmd/server/main.go`, `cmd/grpc/main.go`
 
 ## Scope Summary
 
 - Working today: REST API, GraphQL HTTP endpoint, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
 - Partial today: attachment cleanup retries depend on Kafka-backed background consumers.
-- Main gap today: expanded observability and transport capability parity beyond the core REST, GraphQL, and gRPC surfaces.
+- Main gap today: transport capability parity and richer operational metrics beyond the current structured logging and core REST, GraphQL, and gRPC surfaces.

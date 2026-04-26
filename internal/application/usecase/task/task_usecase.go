@@ -736,8 +736,7 @@ func (uc *TaskUseCase) UploadTaskAttachment(ctx context.Context, taskID uuid.UUI
 	// Save attachment record
 	if err := uc.attachmentRepo.SaveAttachment(ctx, attachment); err != nil {
 		uc.logger.Error("failed to save attachment record", "taskId", taskID, "error", err)
-		// Attempt to clean up S3 object
-		_ = uc.fileStorage.Delete(ctx, storageMeta.Key)
+		uc.cleanupUploadedAttachmentObject(ctx, taskID, attachment.ID, storageMeta.Key, err)
 		return nil, fmt.Errorf("failed to save attachment: %w", err)
 	}
 
@@ -868,29 +867,86 @@ func (uc *TaskUseCase) ensureFileStorageAvailable() error {
 	return nil
 }
 
-func (uc *TaskUseCase) publishAttachmentCleanupRequested(ctx context.Context, taskID, attachmentID uuid.UUID, objectKey string) error {
+func (uc *TaskUseCase) publishAttachmentCleanupRequested(ctx context.Context, taskID, attachmentID uuid.UUID, objectKey, reason string, cause error) error {
 	if !uc.hasEventPublisher() {
+		uc.logger.Error("attachment cleanup retry unavailable",
+			"taskId", taskID,
+			"attachmentId", attachmentID,
+			"objectKey", objectKey,
+			"reason", reason,
+			"error", cause,
+		)
 		return domainerror.NewDomainError(domainerror.CodeInternalError, "attachment cleanup is unavailable")
 	}
 
 	evt := event.NewTaskAttachmentCleanupRequested(taskID, attachmentID, objectKey)
+	uc.logger.Warn("queueing attachment cleanup retry",
+		"taskId", taskID,
+		"attachmentId", attachmentID,
+		"objectKey", objectKey,
+		"reason", reason,
+		"error", cause,
+	)
 	if err := uc.eventPublisher.Publish(ctx, output.TopicTaskEvents, evt); err != nil {
+		uc.logger.Error("failed to queue attachment cleanup retry",
+			"taskId", taskID,
+			"attachmentId", attachmentID,
+			"objectKey", objectKey,
+			"reason", reason,
+			"error", err,
+		)
 		return domainerror.Wrap(domainerror.CodeInternalError, "failed to publish attachment cleanup request", err)
 	}
+	uc.logger.Info("attachment cleanup retry queued",
+		"taskId", taskID,
+		"attachmentId", attachmentID,
+		"objectKey", objectKey,
+		"reason", reason,
+		"eventId", evt.ID,
+	)
 	return nil
 }
 
 func (uc *TaskUseCase) deleteAttachmentObject(ctx context.Context, taskID, attachmentID uuid.UUID, objectKey string) error {
 	if !uc.hasFileStorage() {
-		return uc.publishAttachmentCleanupRequested(ctx, taskID, attachmentID, objectKey)
+		return uc.publishAttachmentCleanupRequested(ctx, taskID, attachmentID, objectKey, "storage_unavailable", nil)
 	}
 
 	if err := uc.fileStorage.Delete(ctx, objectKey); err != nil {
 		uc.logger.Error("failed to delete attachment from storage", "taskId", taskID, "attachmentId", attachmentID, "objectKey", objectKey, "error", err)
-		return uc.publishAttachmentCleanupRequested(ctx, taskID, attachmentID, objectKey)
+		return uc.publishAttachmentCleanupRequested(ctx, taskID, attachmentID, objectKey, "delete_failed", err)
 	}
 
 	return nil
+}
+
+func (uc *TaskUseCase) cleanupUploadedAttachmentObject(ctx context.Context, taskID, attachmentID uuid.UUID, objectKey string, cause error) {
+	if !uc.hasFileStorage() {
+		uc.logger.Error("uploaded attachment cleanup skipped because storage is unavailable",
+			"taskId", taskID,
+			"attachmentId", attachmentID,
+			"objectKey", objectKey,
+			"error", cause,
+		)
+		return
+	}
+
+	if err := uc.fileStorage.Delete(ctx, objectKey); err != nil {
+		uc.logger.Error("failed to roll back uploaded attachment from storage",
+			"taskId", taskID,
+			"attachmentId", attachmentID,
+			"objectKey", objectKey,
+			"error", err,
+		)
+		if publishErr := uc.publishAttachmentCleanupRequested(ctx, taskID, attachmentID, objectKey, "save_attachment_failed", err); publishErr != nil {
+			uc.logger.Error("failed to queue uploaded attachment cleanup retry",
+				"taskId", taskID,
+				"attachmentId", attachmentID,
+				"objectKey", objectKey,
+				"error", publishErr,
+			)
+		}
+	}
 }
 
 func (uc *TaskUseCase) publishTaskEvent(ctx context.Context, evt event.Event) {
