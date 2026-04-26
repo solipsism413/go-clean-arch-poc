@@ -6,12 +6,14 @@ package graphql
 
 import (
 	"context"
-	"fmt"
+	"io"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/auth"
 	"github.com/handiism/go-clean-arch-poc/internal/domain/entity"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 )
 
 // Login is the resolver for the login field.
@@ -212,6 +214,29 @@ func (r *mutationResolver) RemoveLabelFromTask(ctx context.Context, taskID uuid.
 		return nil, err
 	}
 	return r.enrichAndMapTask(ctx, task)
+}
+
+// UploadTaskAttachment is the resolver for the uploadTaskAttachment field.
+func (r *mutationResolver) UploadTaskAttachment(ctx context.Context, taskID uuid.UUID, file graphql.Upload) (*TaskAttachment, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	attachment, err := r.taskService.UploadTaskAttachment(ctx, taskID, file.Filename, file.ContentType, file.File)
+	if err != nil {
+		return nil, err
+	}
+	return taskAttachmentToGraphQL(attachment), nil
+}
+
+// DeleteTaskAttachment is the resolver for the deleteTaskAttachment field.
+func (r *mutationResolver) DeleteTaskAttachment(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) (bool, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return false, err
+	}
+	if err := r.taskService.DeleteTaskAttachment(ctx, taskID, attachmentID); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // UpdateUser is the resolver for the updateUser field.
@@ -548,24 +573,102 @@ func (r *queryResolver) Labels(ctx context.Context) ([]*Label, error) {
 	return result, nil
 }
 
+// TaskAttachments is the resolver for the taskAttachments field.
+func (r *queryResolver) TaskAttachments(ctx context.Context, taskID uuid.UUID) ([]*TaskAttachment, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	attachments, err := r.taskService.ListTaskAttachments(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	return taskAttachmentListToGraphQL(attachments), nil
+}
+
+// DownloadTaskAttachment is the resolver for the downloadTaskAttachment field.
+func (r *queryResolver) DownloadTaskAttachment(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) (*TaskAttachmentDownload, error) {
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	reader, attachment, err := r.taskService.DownloadTaskAttachment(ctx, taskID, attachmentID)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return taskAttachmentDownloadToGraphQL(attachment, content), nil
+}
+
 // TaskCreated is the resolver for the taskCreated field.
 func (r *subscriptionResolver) TaskCreated(ctx context.Context) (<-chan *Task, error) {
-	return nil, fmt.Errorf("subscriptions not implemented")
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	return r.streamTasks(ctx, func(evt event.Event) bool { return evt.EventType() == "task.created" })
 }
 
 // TaskUpdated is the resolver for the taskUpdated field.
 func (r *subscriptionResolver) TaskUpdated(ctx context.Context, id *uuid.UUID) (<-chan *Task, error) {
-	return nil, fmt.Errorf("subscriptions not implemented")
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	return r.streamTasks(ctx, func(evt event.Event) bool {
+		if evt.EventType() != "task.updated" {
+			return false
+		}
+		return id == nil || evt.AggregateID() == *id
+	})
 }
 
 // TaskDeleted is the resolver for the taskDeleted field.
 func (r *subscriptionResolver) TaskDeleted(ctx context.Context) (<-chan uuid.UUID, error) {
-	return nil, fmt.Errorf("subscriptions not implemented")
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	subscription := r.subscriptions.Subscribe(ctx)
+	out := make(chan uuid.UUID, 1)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case evt, ok := <-subscription:
+				if !ok {
+					return
+				}
+				if evt.EventType() != "task.deleted" {
+					continue
+				}
+				select {
+				case out <- evt.AggregateID():
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return out, nil
 }
 
 // TaskAssigned is the resolver for the taskAssigned field.
 func (r *subscriptionResolver) TaskAssigned(ctx context.Context, assigneeID *uuid.UUID) (<-chan *Task, error) {
-	return nil, fmt.Errorf("subscriptions not implemented")
+	if _, err := requireAuth(ctx); err != nil {
+		return nil, err
+	}
+	return r.streamTasks(ctx, func(evt event.Event) bool {
+		if evt.EventType() != "task.assigned" {
+			return false
+		}
+		if assigneeID == nil {
+			return true
+		}
+		return matchesAssignee(evt, *assigneeID)
+	})
 }
 
 // Mutation returns MutationResolver implementation.

@@ -2,6 +2,7 @@
 
 scalar UUID
 scalar DateTime
+scalar Upload
 
 type Query {
   # Task queries
@@ -21,6 +22,8 @@ type Query {
   # Label queries
   label(id: UUID!): Label
   labels: [Label!]!
+  taskAttachments(taskId: UUID!): [TaskAttachment!]!
+  downloadTaskAttachment(taskId: UUID!, attachmentId: UUID!): TaskAttachmentDownload!
 }
 
 type Mutation {
@@ -41,6 +44,8 @@ type Mutation {
   archiveTask(id: UUID!): Task!
   addLabelToTask(taskId: UUID!, labelId: UUID!): Task!
   removeLabelFromTask(taskId: UUID!, labelId: UUID!): Task!
+  uploadTaskAttachment(taskId: UUID!, file: Upload!): TaskAttachment!
+  deleteTaskAttachment(taskId: UUID!, attachmentId: UUID!): Boolean!
 
   # User mutations
   updateUser(id: UUID!, input: UpdateUserInput!): User!
@@ -75,8 +80,24 @@ type Task {
   assignee: User
   creator: User!
   labels: [Label!]!
+  attachments: [TaskAttachment!]!
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+type TaskAttachment {
+  id: UUID!
+  taskId: UUID!
+  filename: String!
+  contentType: String!
+  sizeBytes: Int!
+  uploadedBy: UUID!
+  createdAt: DateTime!
+}
+
+type TaskAttachmentDownload {
+  attachment: TaskAttachment!
+  contentBase64: String!
 }
 
 type User {

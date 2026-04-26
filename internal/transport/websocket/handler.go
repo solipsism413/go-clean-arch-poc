@@ -19,14 +19,21 @@ import (
 type MessageType string
 
 const (
-	MessageTypeSubscribe   MessageType = "subscribe"
-	MessageTypeUnsubscribe MessageType = "unsubscribe"
-	MessageTypeTaskCreated MessageType = "task.created"
-	MessageTypeTaskUpdated MessageType = "task.updated"
-	MessageTypeTaskDeleted MessageType = "task.deleted"
-	MessageTypePing        MessageType = "ping"
-	MessageTypePong        MessageType = "pong"
-	MessageTypeError       MessageType = "error"
+	MessageTypeSubscribe         MessageType = "subscribe"
+	MessageTypeUnsubscribe       MessageType = "unsubscribe"
+	MessageTypeTaskCreated       MessageType = "task.created"
+	MessageTypeTaskUpdated       MessageType = "task.updated"
+	MessageTypeTaskDeleted       MessageType = "task.deleted"
+	MessageTypeTaskAssigned      MessageType = "task.assigned"
+	MessageTypeTaskUnassigned    MessageType = "task.unassigned"
+	MessageTypeTaskCompleted     MessageType = "task.completed"
+	MessageTypeTaskArchived      MessageType = "task.archived"
+	MessageTypeTaskStatusChanged MessageType = "task.status_changed"
+	MessageTypeTaskLabelAdded    MessageType = "task.label_added"
+	MessageTypeTaskLabelRemoved  MessageType = "task.label_removed"
+	MessageTypePing              MessageType = "ping"
+	MessageTypePong              MessageType = "pong"
+	MessageTypeError             MessageType = "error"
 )
 
 // Message represents a WebSocket message.
@@ -306,6 +313,20 @@ func (h *EventHandler) HandleEvent(evt event.Event) {
 		msgType = MessageTypeTaskUpdated
 	case "task.deleted":
 		msgType = MessageTypeTaskDeleted
+	case "task.assigned":
+		msgType = MessageTypeTaskAssigned
+	case "task.unassigned":
+		msgType = MessageTypeTaskUnassigned
+	case "task.completed":
+		msgType = MessageTypeTaskCompleted
+	case "task.archived":
+		msgType = MessageTypeTaskArchived
+	case "task.status_changed":
+		msgType = MessageTypeTaskStatusChanged
+	case "task.label_added":
+		msgType = MessageTypeTaskLabelAdded
+	case "task.label_removed":
+		msgType = MessageTypeTaskLabelRemoved
 	default:
 		return
 	}

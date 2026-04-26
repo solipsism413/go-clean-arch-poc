@@ -2,12 +2,16 @@ package graphql
 
 import (
 	"context"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
+	graphqlupload "github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 	"github.com/handiism/go-clean-arch-poc/internal/application/dto"
 	"github.com/handiism/go-clean-arch-poc/internal/auth"
+	"github.com/handiism/go-clean-arch-poc/internal/domain/event"
 	"github.com/handiism/go-clean-arch-poc/internal/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -111,6 +115,73 @@ func TestQueryResolver_Label(t *testing.T) {
 	require.Equal(t, labelID, result.ID)
 	require.Equal(t, "backend", result.Name)
 	require.Equal(t, "#2563eb", result.Color)
+}
+
+func TestMutationResolver_UploadTaskAttachment(t *testing.T) {
+	taskService := mocks.NewMockTaskService(t)
+	resolver := &mutationResolver{&Resolver{taskService: taskService}}
+	ctx := authenticatedGraphQLContext()
+	taskID := uuid.New()
+	createdAt := time.Now().UTC()
+
+	taskService.EXPECT().UploadTaskAttachment(mock.Anything, taskID, "report.txt", "text/plain", mock.Anything).Return(&dto.TaskAttachmentOutput{
+		ID:          uuid.New(),
+		TaskID:      taskID,
+		Filename:    "report.txt",
+		ContentType: "text/plain",
+		SizeBytes:   5,
+		UploadedBy:  uuid.New(),
+		CreatedAt:   createdAt,
+	}, nil).Once()
+
+	result, err := resolver.UploadTaskAttachment(ctx, taskID, graphqlupload.Upload{Filename: "report.txt", ContentType: "text/plain", File: strings.NewReader("hello")})
+	require.NoError(t, err)
+	require.Equal(t, taskID, result.TaskID)
+	require.Equal(t, "report.txt", result.Filename)
+	require.Equal(t, 5, result.SizeBytes)
+}
+
+func TestQueryResolver_DownloadTaskAttachment(t *testing.T) {
+	taskService := mocks.NewMockTaskService(t)
+	resolver := &queryResolver{&Resolver{taskService: taskService}}
+	ctx := authenticatedGraphQLContext()
+	taskID := uuid.New()
+	attachmentID := uuid.New()
+
+	taskService.EXPECT().DownloadTaskAttachment(mock.Anything, taskID, attachmentID).Return(io.NopCloser(strings.NewReader("hello")), &dto.TaskAttachmentOutput{
+		ID:          attachmentID,
+		TaskID:      taskID,
+		Filename:    "report.txt",
+		ContentType: "text/plain",
+		SizeBytes:   5,
+		UploadedBy:  uuid.New(),
+		CreatedAt:   time.Now().UTC(),
+	}, nil).Once()
+
+	result, err := resolver.DownloadTaskAttachment(ctx, taskID, attachmentID)
+	require.NoError(t, err)
+	require.Equal(t, attachmentID, result.Attachment.ID)
+	require.Equal(t, "aGVsbG8=", result.ContentBase64)
+}
+
+func TestSubscriptionResolver_TaskDeleted(t *testing.T) {
+	broker := NewSubscriptionBroker()
+	resolver := &subscriptionResolver{&Resolver{subscriptions: broker}}
+	ctx, cancel := context.WithCancel(authenticatedGraphQLContext())
+	defer cancel()
+
+	ch, err := resolver.TaskDeleted(ctx)
+	require.NoError(t, err)
+
+	taskID := uuid.New()
+	broker.Publish(event.NewTaskDeleted(taskID, uuid.New()))
+
+	select {
+	case received := <-ch:
+		require.Equal(t, taskID, received)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for task deletion event")
+	}
 }
 
 func authenticatedGraphQLContext() context.Context {

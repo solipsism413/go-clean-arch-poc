@@ -13,7 +13,7 @@ This directory contains the maintained project documentation for `go-clean-arch-
 
 The repository already delivers a working HTTP application with a clear layered structure around domain, application, transport, and infrastructure code. REST endpoints, JWT-based authentication, RBAC and ACL checks, realtime transports, persistence, and broad automated tests are already present.
 
-The main delivery gaps are transport parity and operational hardening around attachment cleanup retries and observability.
+Recent delivery work closed the major transport parity gaps and added operational metrics plus active alert state for background workflows.
 
 The preferred operational view is `docs/status.md`, which combines completed work and planned next steps in one checklist.
 

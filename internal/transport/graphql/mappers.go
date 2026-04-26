@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 
@@ -114,8 +115,45 @@ func taskToGraphQL(t *dto.TaskOutput, assignee, creator *dto.UserOutput) *Task {
 		Assignee:    userToGraphQL(assignee),
 		Creator:     userToGraphQL(creator),
 		Labels:      labels,
+		Attachments: []*TaskAttachment{},
 		CreatedAt:   t.CreatedAt,
 		UpdatedAt:   t.UpdatedAt,
+	}
+}
+
+func taskAttachmentToGraphQL(attachment *dto.TaskAttachmentOutput) *TaskAttachment {
+	if attachment == nil {
+		return nil
+	}
+	return &TaskAttachment{
+		ID:          attachment.ID,
+		TaskID:      attachment.TaskID,
+		Filename:    attachment.Filename,
+		ContentType: attachment.ContentType,
+		SizeBytes:   int(attachment.SizeBytes),
+		UploadedBy:  attachment.UploadedBy,
+		CreatedAt:   attachment.CreatedAt,
+	}
+}
+
+func taskAttachmentListToGraphQL(list *dto.TaskAttachmentListOutput) []*TaskAttachment {
+	if list == nil {
+		return []*TaskAttachment{}
+	}
+	attachments := make([]*TaskAttachment, 0, len(list.Attachments))
+	for i := range list.Attachments {
+		attachments = append(attachments, taskAttachmentToGraphQL(&list.Attachments[i]))
+	}
+	return attachments
+}
+
+func taskAttachmentDownloadToGraphQL(attachment *dto.TaskAttachmentOutput, content []byte) *TaskAttachmentDownload {
+	if attachment == nil {
+		return nil
+	}
+	return &TaskAttachmentDownload{
+		Attachment:    taskAttachmentToGraphQL(attachment),
+		ContentBase64: base64.StdEncoding.EncodeToString(content),
 	}
 }
 

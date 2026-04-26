@@ -94,17 +94,33 @@ type Subscription struct {
 }
 
 type Task struct {
-	ID          uuid.UUID  `json:"id"`
-	Title       string     `json:"title"`
-	Description *string    `json:"description,omitempty"`
-	Status      TaskStatus `json:"status"`
-	Priority    Priority   `json:"priority"`
-	DueDate     *time.Time `json:"dueDate,omitempty"`
-	Assignee    *User      `json:"assignee,omitempty"`
-	Creator     *User      `json:"creator"`
-	Labels      []*Label   `json:"labels"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
+	ID          uuid.UUID         `json:"id"`
+	Title       string            `json:"title"`
+	Description *string           `json:"description,omitempty"`
+	Status      TaskStatus        `json:"status"`
+	Priority    Priority          `json:"priority"`
+	DueDate     *time.Time        `json:"dueDate,omitempty"`
+	Assignee    *User             `json:"assignee,omitempty"`
+	Creator     *User             `json:"creator"`
+	Labels      []*Label          `json:"labels"`
+	Attachments []*TaskAttachment `json:"attachments"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
+}
+
+type TaskAttachment struct {
+	ID          uuid.UUID `json:"id"`
+	TaskID      uuid.UUID `json:"taskId"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"contentType"`
+	SizeBytes   int       `json:"sizeBytes"`
+	UploadedBy  uuid.UUID `json:"uploadedBy"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type TaskAttachmentDownload struct {
+	Attachment    *TaskAttachment `json:"attachment"`
+	ContentBase64 string          `json:"contentBase64"`
 }
 
 type TaskConnection struct {

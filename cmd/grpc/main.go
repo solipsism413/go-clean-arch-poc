@@ -20,7 +20,10 @@ import (
 	redisCache "github.com/handiism/go-clean-arch-poc/internal/infrastructure/cache/redis"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/repository"
+	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/fanout"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/kafka"
+	memoryMessaging "github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/memory"
+	backgroundobs "github.com/handiism/go-clean-arch-poc/internal/infrastructure/observability/background"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/observability/logger"
 	s3Storage "github.com/handiism/go-clean-arch-poc/internal/infrastructure/storage/s3"
 	grpcTransport "github.com/handiism/go-clean-arch-poc/internal/transport/grpc"
@@ -68,14 +71,18 @@ func main() {
 		defer cacheRepo.Close()
 	}
 
+	backgroundMonitor := backgroundobs.NewMonitor(log)
+	localEventBus := memoryMessaging.NewEventBus()
+
 	// Initialize Kafka event publisher
-	eventPublisher, err := kafka.NewEventPublisher(ctx, cfg.Kafka, log)
+	kafkaEventPublisher, err := kafka.NewEventPublisher(ctx, cfg.Kafka, log)
 	if err != nil {
 		log.Warn("failed to initialize kafka, events will not be published", "error", err)
 	} else {
 		log.Info("connected to kafka")
-		defer eventPublisher.Close()
 	}
+	eventPublisher := fanout.NewPublisher(kafkaEventPublisher, localEventBus)
+	defer eventPublisher.Close()
 
 	var eventSubscriber output.EventSubscriber
 	sub, err := kafka.NewEventSubscriber(ctx, cfg.Kafka, log)
@@ -118,7 +125,7 @@ func main() {
 	labelService := labelUseCase.NewLabelUseCase(labelRepo, v, log)
 
 	eventConsumer := worker.NewEventConsumer(log)
-	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", worker.NewTaskAttachmentCleanupHandler(fileStorage, log))
+	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", backgroundMonitor.WrapHandler("task.attachment_cleanup_requested", worker.NewTaskAttachmentCleanupHandler(fileStorage, log)))
 
 	if eventSubscriber != nil {
 		if err := eventConsumer.Start(ctx, eventSubscriber, []string{output.TopicTaskEvents, output.TopicUserEvents}); err != nil {
@@ -126,6 +133,16 @@ func main() {
 		} else {
 			log.Info("background event consumer started")
 			defer eventConsumer.Stop()
+		}
+	}
+
+	if eventSubscriber == nil {
+		localConsumer := worker.NewEventConsumer(log)
+		localConsumer.RegisterHandler("task.attachment_cleanup_requested", backgroundMonitor.WrapHandler("task.attachment_cleanup_requested.local", worker.NewTaskAttachmentCleanupHandler(fileStorage, log)))
+		if err := localConsumer.Start(ctx, localEventBus, []string{output.TopicTaskEvents, output.TopicUserEvents}); err != nil {
+			log.Warn("failed to start local event consumer", "error", err)
+		} else {
+			defer localConsumer.Stop()
 		}
 	}
 

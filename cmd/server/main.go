@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"expvar"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -27,7 +28,10 @@ import (
 	redisCache "github.com/handiism/go-clean-arch-poc/internal/infrastructure/cache/redis"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/postgres"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/database/repository"
+	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/fanout"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/kafka"
+	memoryMessaging "github.com/handiism/go-clean-arch-poc/internal/infrastructure/messaging/memory"
+	backgroundobs "github.com/handiism/go-clean-arch-poc/internal/infrastructure/observability/background"
 	"github.com/handiism/go-clean-arch-poc/internal/infrastructure/observability/logger"
 	s3Storage "github.com/handiism/go-clean-arch-poc/internal/infrastructure/storage/s3"
 	"github.com/handiism/go-clean-arch-poc/internal/transport/graphql"
@@ -98,14 +102,18 @@ func main() {
 		defer cacheRepo.Close()
 	}
 
+	backgroundMonitor := backgroundobs.NewMonitor(log)
+	localEventBus := memoryMessaging.NewEventBus()
+
 	// Initialize Kafka event publisher
-	eventPublisher, err := kafka.NewEventPublisher(ctx, cfg.Kafka, log)
+	kafkaEventPublisher, err := kafka.NewEventPublisher(ctx, cfg.Kafka, log)
 	if err != nil {
 		log.Warn("failed to initialize kafka, events will not be published", "error", err)
 	} else {
 		log.Info("connected to kafka")
-		defer eventPublisher.Close()
 	}
+	eventPublisher := fanout.NewPublisher(kafkaEventPublisher, localEventBus)
+	defer eventPublisher.Close()
 
 	// Initialize Kafka event subscriber for background consumers
 	var eventSubscriber output.EventSubscriber
@@ -156,23 +164,23 @@ func main() {
 
 	// Initialize background event consumer
 	eventConsumer := worker.NewEventConsumer(log)
-	eventConsumer.RegisterHandler("task.created", func(ctx context.Context, evt event.Event) error {
+	eventConsumer.RegisterHandler("task.created", backgroundMonitor.WrapHandler("task.created", func(ctx context.Context, evt event.Event) error {
 		log.Info("background handler: task created", "taskID", evt.AggregateID())
 		return nil
-	})
-	eventConsumer.RegisterHandler("task.updated", func(ctx context.Context, evt event.Event) error {
+	}))
+	eventConsumer.RegisterHandler("task.updated", backgroundMonitor.WrapHandler("task.updated", func(ctx context.Context, evt event.Event) error {
 		log.Info("background handler: task updated", "taskID", evt.AggregateID())
 		return nil
-	})
-	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", worker.NewTaskAttachmentCleanupHandler(fileStorage, log))
-	eventConsumer.RegisterHandler("user.created", func(ctx context.Context, evt event.Event) error {
+	}))
+	eventConsumer.RegisterHandler("task.attachment_cleanup_requested", backgroundMonitor.WrapHandler("task.attachment_cleanup_requested", worker.NewTaskAttachmentCleanupHandler(fileStorage, log)))
+	eventConsumer.RegisterHandler("user.created", backgroundMonitor.WrapHandler("user.created", func(ctx context.Context, evt event.Event) error {
 		log.Info("background handler: user created", "userID", evt.AggregateID())
 		return nil
-	})
-	eventConsumer.RegisterHandler("user.logged_in", func(ctx context.Context, evt event.Event) error {
+	}))
+	eventConsumer.RegisterHandler("user.logged_in", backgroundMonitor.WrapHandler("user.logged_in", func(ctx context.Context, evt event.Event) error {
 		log.Info("background handler: user logged in", "userID", evt.AggregateID())
 		return nil
-	})
+	}))
 
 	if eventSubscriber != nil {
 		if err := eventConsumer.Start(ctx, eventSubscriber, []string{output.TopicTaskEvents, output.TopicUserEvents}); err != nil {
@@ -197,6 +205,7 @@ func main() {
 	// Initialize WebSocket
 	// =====================
 	wsHub := websocket.NewHub(log)
+	wsEventHandler := websocket.NewEventHandler(wsHub, log)
 	go wsHub.Run(ctx)
 	log.Info("websocket hub started")
 
@@ -204,6 +213,7 @@ func main() {
 	// Initialize SSE
 	// =====================
 	sseBroker := sse.NewBroker(log)
+	sseEventHandler := sse.NewEventHandler(sseBroker, log)
 	go sseBroker.Run(ctx)
 	log.Info("sse broker started")
 
@@ -211,9 +221,11 @@ func main() {
 	// Initialize Socket.IO
 	// =====================
 	socketIOHandler, err := socketio.NewHandler(taskService, log)
+	var socketIOEventHandler *socketio.EventHandler
 	if err != nil {
 		log.Warn("failed to initialize socket.io", "error", err)
 	} else {
+		socketIOEventHandler = socketio.NewEventHandler(socketIOHandler, log)
 		if err := socketIOHandler.Start(ctx); err != nil {
 			log.Warn("failed to start socket.io", "error", err)
 		} else {
@@ -229,11 +241,45 @@ func main() {
 	// =====================
 	// Initialize GraphQL
 	// =====================
-	graphQLResolver := graphql.NewResolver(taskService, userService, authService, labelService, roleService, authorizer)
+	graphQLSubscriptions := graphql.NewSubscriptionBroker()
+	graphQLResolver := graphql.NewResolver(taskService, userService, authService, labelService, roleService, authorizer, graphQLSubscriptions)
 	graphQLHandler := graphql.NewHandler(graphQLResolver, authService)
 	router.Handle("POST /graphql", graphQLHandler)
 	router.Handle("GET /graphql", graphQLHandler)
 	router.Handle("GET /graphql/playground", graphql.NewPlaygroundHandler("/graphql"))
+	router.Handle("GET /debug/vars", expvar.Handler())
+
+	realtimeConsumer := worker.NewEventConsumer(log)
+	registerRealtimeHandler := func(eventType string) {
+		realtimeConsumer.RegisterHandler(eventType, func(ctx context.Context, evt event.Event) error {
+			wsEventHandler.HandleEvent(evt)
+			sseEventHandler.HandleEvent(evt)
+			if socketIOEventHandler != nil {
+				socketIOEventHandler.HandleEvent(evt)
+			}
+			graphQLSubscriptions.Publish(evt)
+			return nil
+		})
+	}
+	registerRealtimeHandler("task.created")
+	registerRealtimeHandler("task.updated")
+	registerRealtimeHandler("task.deleted")
+	registerRealtimeHandler("task.assigned")
+	registerRealtimeHandler("task.unassigned")
+	registerRealtimeHandler("task.completed")
+	registerRealtimeHandler("task.archived")
+	registerRealtimeHandler("task.status_changed")
+	registerRealtimeHandler("task.label_added")
+	registerRealtimeHandler("task.label_removed")
+
+	if eventSubscriber == nil {
+		realtimeConsumer.RegisterHandler("task.attachment_cleanup_requested", backgroundMonitor.WrapHandler("task.attachment_cleanup_requested.local", worker.NewTaskAttachmentCleanupHandler(fileStorage, log)))
+	}
+	if err := realtimeConsumer.Start(ctx, localEventBus, []string{output.TopicTaskEvents, output.TopicUserEvents}); err != nil {
+		log.Warn("failed to start local realtime consumer", "error", err)
+	} else {
+		defer realtimeConsumer.Stop()
+	}
 
 	// Register WebSocket handler
 	router.Handle("GET /ws", websocket.NewHandler(wsHub, taskService, authService, log))

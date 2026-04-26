@@ -30,29 +30,31 @@ This file is the single operational view for implementation progress, current pr
 
 ## Next
 
-- [ ] Close remaining transport parity gaps such as task attachments and GraphQL or realtime subscription coverage.
+- [x] Close remaining transport parity gaps such as task attachments and GraphQL or realtime subscription coverage.
 
 ## Later
 
-- [ ] Add richer operational metrics and alerting beyond structured logging for background workflows.
+- [x] Add richer operational metrics and alerting beyond structured logging for background workflows.
 
 ## Notes
 
 - GraphQL HTTP endpoint is now available at `/graphql` with a Playground at `/graphql/playground`.
   Reference: `internal/transport/graphql/`, `cmd/server/main.go`
-- GraphQL now covers task completion, task archiving, overdue task queries, and single-label lookup in addition to its existing CRUD surface.
+- GraphQL now covers task completion, task archiving, overdue task queries, task attachments, and task subscriptions in addition to its existing CRUD surface.
   Reference: `internal/transport/graphql/schema.graphqls`, `internal/transport/graphql/schema.resolvers.go`
 - gRPC services are fully implemented and registered for task, user, auth, and label operations.
   Reference: `cmd/grpc/main.go`, `internal/transport/grpc/services.go`
-- Task attachment workflows are available over REST and store blobs in S3 or MinIO.
-  Reference: `internal/transport/rest/handler/task_handler.go`, `internal/application/usecase/task/task_usecase.go`
+- Task attachment workflows are available over REST and GraphQL and store blobs in S3 or MinIO.
+  Reference: `internal/transport/rest/handler/task_handler.go`, `internal/transport/graphql/schema.graphqls`, `internal/application/usecase/task/task_usecase.go`
 - Attachment uploads enforce a 32 MiB request limit, and failed blob deletions publish retry events for background cleanup.
   Reference: `internal/transport/rest/handler/task_handler.go`, `internal/domain/event/task_events.go`, `cmd/server/main.go`, `cmd/grpc/main.go`
 - Attachment cleanup retries and upload rollback failures now emit structured logs with task, attachment, object-key, and retry context in both HTTP and gRPC startup paths.
   Reference: `internal/application/usecase/task/task_usecase.go`, `internal/application/worker/task_attachment_cleanup_handler.go`, `cmd/server/main.go`, `cmd/grpc/main.go`
+- Background workflows now export expvar metrics and active alert state at `/debug/vars`, and local in-process event fanout keeps realtime subscriptions active even when Kafka-backed subscribers are unavailable.
+  Reference: `internal/infrastructure/observability/background/monitor.go`, `internal/infrastructure/messaging/fanout/publisher.go`, `cmd/server/main.go`, `cmd/grpc/main.go`
 
 ## Scope Summary
 
 - Working today: REST API, GraphQL HTTP endpoint, gRPC services, JWT auth, RBAC and ACL, realtime transports, PostgreSQL, Redis, Kafka, S3 or MinIO bootstrap, Swagger, CI, and broad automated tests.
-- Partial today: attachment cleanup retries depend on Kafka-backed background consumers.
-- Main gap today: attachment and subscription parity across transports, plus richer operational metrics beyond the current structured logging and core REST, GraphQL, and gRPC surfaces.
+- Working today: attachment cleanup retries can also fall back to the local in-process event bus when Kafka subscribers are unavailable.
+- Remaining gap today: external alert delivery is still not wired to a paging or incident-management system.

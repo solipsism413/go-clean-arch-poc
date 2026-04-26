@@ -30,12 +30,19 @@ const (
 type EventName string
 
 const (
-	EventTaskCreated EventName = "task:created"
-	EventTaskUpdated EventName = "task:updated"
-	EventTaskDeleted EventName = "task:deleted"
-	EventJoinRoom    EventName = "join"
-	EventLeaveRoom   EventName = "leave"
-	EventError       EventName = "error"
+	EventTaskCreated       EventName = "task:created"
+	EventTaskUpdated       EventName = "task:updated"
+	EventTaskDeleted       EventName = "task:deleted"
+	EventTaskAssigned      EventName = "task:assigned"
+	EventTaskUnassigned    EventName = "task:unassigned"
+	EventTaskCompleted     EventName = "task:completed"
+	EventTaskArchived      EventName = "task:archived"
+	EventTaskStatusChanged EventName = "task:status_changed"
+	EventTaskLabelAdded    EventName = "task:label_added"
+	EventTaskLabelRemoved  EventName = "task:label_removed"
+	EventJoinRoom          EventName = "join"
+	EventLeaveRoom         EventName = "leave"
+	EventError             EventName = "error"
 )
 
 // Handler manages Socket.IO connections and events.
@@ -169,6 +176,20 @@ func (h *EventHandler) HandleEvent(evt event.Event) {
 		eventName = EventTaskUpdated
 	case "task.deleted":
 		eventName = EventTaskDeleted
+	case "task.assigned":
+		eventName = EventTaskAssigned
+	case "task.unassigned":
+		eventName = EventTaskUnassigned
+	case "task.completed":
+		eventName = EventTaskCompleted
+	case "task.archived":
+		eventName = EventTaskArchived
+	case "task.status_changed":
+		eventName = EventTaskStatusChanged
+	case "task.label_added":
+		eventName = EventTaskLabelAdded
+	case "task.label_removed":
+		eventName = EventTaskLabelRemoved
 	default:
 		return
 	}

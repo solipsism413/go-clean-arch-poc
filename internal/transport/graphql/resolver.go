@@ -12,12 +12,13 @@ import (
 
 // Resolver serves as dependency injection for the GraphQL resolvers.
 type Resolver struct {
-	taskService  input.TaskService
-	userService  input.UserService
-	authService  input.AuthService
-	labelService input.LabelService
-	roleService  input.RoleService
-	authorizer   *rbac.Authorizer
+	taskService   input.TaskService
+	userService   input.UserService
+	authService   input.AuthService
+	labelService  input.LabelService
+	roleService   input.RoleService
+	authorizer    *rbac.Authorizer
+	subscriptions *SubscriptionBroker
 }
 
 // NewResolver creates a new Resolver with the given services.
@@ -28,14 +29,16 @@ func NewResolver(
 	labelService input.LabelService,
 	roleService input.RoleService,
 	authorizer *rbac.Authorizer,
+	subscriptions *SubscriptionBroker,
 ) *Resolver {
 	return &Resolver{
-		taskService:  taskService,
-		userService:  userService,
-		authService:  authService,
-		labelService: labelService,
-		roleService:  roleService,
-		authorizer:   authorizer,
+		taskService:   taskService,
+		userService:   userService,
+		authService:   authService,
+		labelService:  labelService,
+		roleService:   roleService,
+		authorizer:    authorizer,
+		subscriptions: subscriptions,
 	}
 }
 

@@ -18,10 +18,17 @@ import (
 type EventType string
 
 const (
-	EventTypeTaskCreated EventType = "task.created"
-	EventTypeTaskUpdated EventType = "task.updated"
-	EventTypeTaskDeleted EventType = "task.deleted"
-	EventTypeHeartbeat   EventType = "heartbeat"
+	EventTypeTaskCreated       EventType = "task.created"
+	EventTypeTaskUpdated       EventType = "task.updated"
+	EventTypeTaskDeleted       EventType = "task.deleted"
+	EventTypeTaskAssigned      EventType = "task.assigned"
+	EventTypeTaskUnassigned    EventType = "task.unassigned"
+	EventTypeTaskCompleted     EventType = "task.completed"
+	EventTypeTaskArchived      EventType = "task.archived"
+	EventTypeTaskStatusChanged EventType = "task.status_changed"
+	EventTypeTaskLabelAdded    EventType = "task.label_added"
+	EventTypeTaskLabelRemoved  EventType = "task.label_removed"
+	EventTypeHeartbeat         EventType = "heartbeat"
 )
 
 // Client represents an SSE client connection.
@@ -222,6 +229,20 @@ func (h *EventHandler) HandleEvent(evt event.Event) {
 		eventType = EventTypeTaskUpdated
 	case "task.deleted":
 		eventType = EventTypeTaskDeleted
+	case "task.assigned":
+		eventType = EventTypeTaskAssigned
+	case "task.unassigned":
+		eventType = EventTypeTaskUnassigned
+	case "task.completed":
+		eventType = EventTypeTaskCompleted
+	case "task.archived":
+		eventType = EventTypeTaskArchived
+	case "task.status_changed":
+		eventType = EventTypeTaskStatusChanged
+	case "task.label_added":
+		eventType = EventTypeTaskLabelAdded
+	case "task.label_removed":
+		eventType = EventTypeTaskLabelRemoved
 	default:
 		return
 	}

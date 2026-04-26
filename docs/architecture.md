@@ -78,6 +78,8 @@ It is responsible for:
 - constructing JWT auth, RBAC, and ACL middleware dependencies
 - registering REST, WebSocket, SSE, and Socket.IO transports
 - registering background consumers for task-event retries such as attachment cleanup
+- wiring a local event fanout path for realtime transports and GraphQL subscriptions
+- exposing background workflow metrics and alert state through `expvar`
 - starting the HTTP server and handling graceful shutdown
 
 ### gRPC Server
@@ -88,6 +90,7 @@ Current state:
 
 - concrete task, user, auth, and label services are registered
 - Kafka-backed background consumers are also started for task-event retries such as attachment cleanup
+- a local in-process event bus can handle attachment cleanup retries when Kafka subscribers are unavailable
 - configured gRPC port support is active through `cfg.GRPC.Port`
 
 ## Security Model

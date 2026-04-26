@@ -65,28 +65,30 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddLabelToTask      func(childComplexity int, taskID uuid.UUID, labelID uuid.UUID) int
-		ArchiveTask         func(childComplexity int, id uuid.UUID) int
-		AssignRole          func(childComplexity int, userID uuid.UUID, roleID uuid.UUID) int
-		AssignTask          func(childComplexity int, id uuid.UUID, assigneeID uuid.UUID) int
-		ChangePassword      func(childComplexity int, input ChangePasswordInput) int
-		ChangeTaskStatus    func(childComplexity int, id uuid.UUID, status TaskStatus) int
-		CompleteTask        func(childComplexity int, id uuid.UUID) int
-		CreateLabel         func(childComplexity int, input CreateLabelInput) int
-		CreateTask          func(childComplexity int, input CreateTaskInput) int
-		DeleteLabel         func(childComplexity int, id uuid.UUID) int
-		DeleteTask          func(childComplexity int, id uuid.UUID) int
-		DeleteUser          func(childComplexity int, id uuid.UUID) int
-		Login               func(childComplexity int, input LoginInput) int
-		Logout              func(childComplexity int) int
-		RefreshToken        func(childComplexity int, refreshToken string) int
-		Register            func(childComplexity int, input RegisterInput) int
-		RemoveLabelFromTask func(childComplexity int, taskID uuid.UUID, labelID uuid.UUID) int
-		RemoveRole          func(childComplexity int, userID uuid.UUID, roleID uuid.UUID) int
-		UnassignTask        func(childComplexity int, id uuid.UUID) int
-		UpdateLabel         func(childComplexity int, id uuid.UUID, input UpdateLabelInput) int
-		UpdateTask          func(childComplexity int, id uuid.UUID, input UpdateTaskInput) int
-		UpdateUser          func(childComplexity int, id uuid.UUID, input UpdateUserInput) int
+		AddLabelToTask       func(childComplexity int, taskID uuid.UUID, labelID uuid.UUID) int
+		ArchiveTask          func(childComplexity int, id uuid.UUID) int
+		AssignRole           func(childComplexity int, userID uuid.UUID, roleID uuid.UUID) int
+		AssignTask           func(childComplexity int, id uuid.UUID, assigneeID uuid.UUID) int
+		ChangePassword       func(childComplexity int, input ChangePasswordInput) int
+		ChangeTaskStatus     func(childComplexity int, id uuid.UUID, status TaskStatus) int
+		CompleteTask         func(childComplexity int, id uuid.UUID) int
+		CreateLabel          func(childComplexity int, input CreateLabelInput) int
+		CreateTask           func(childComplexity int, input CreateTaskInput) int
+		DeleteLabel          func(childComplexity int, id uuid.UUID) int
+		DeleteTask           func(childComplexity int, id uuid.UUID) int
+		DeleteTaskAttachment func(childComplexity int, taskID uuid.UUID, attachmentID uuid.UUID) int
+		DeleteUser           func(childComplexity int, id uuid.UUID) int
+		Login                func(childComplexity int, input LoginInput) int
+		Logout               func(childComplexity int) int
+		RefreshToken         func(childComplexity int, refreshToken string) int
+		Register             func(childComplexity int, input RegisterInput) int
+		RemoveLabelFromTask  func(childComplexity int, taskID uuid.UUID, labelID uuid.UUID) int
+		RemoveRole           func(childComplexity int, userID uuid.UUID, roleID uuid.UUID) int
+		UnassignTask         func(childComplexity int, id uuid.UUID) int
+		UpdateLabel          func(childComplexity int, id uuid.UUID, input UpdateLabelInput) int
+		UpdateTask           func(childComplexity int, id uuid.UUID, input UpdateTaskInput) int
+		UpdateUser           func(childComplexity int, id uuid.UUID, input UpdateUserInput) int
+		UploadTaskAttachment func(childComplexity int, taskID uuid.UUID, file graphql.Upload) int
 	}
 
 	PageInfo struct {
@@ -104,16 +106,18 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Label        func(childComplexity int, id uuid.UUID) int
-		Labels       func(childComplexity int) int
-		Me           func(childComplexity int) int
-		OverdueTasks func(childComplexity int, pagination *PaginationInput) int
-		Role         func(childComplexity int, id uuid.UUID) int
-		Roles        func(childComplexity int) int
-		Task         func(childComplexity int, id uuid.UUID) int
-		Tasks        func(childComplexity int, filter *TaskFilter, pagination *PaginationInput) int
-		User         func(childComplexity int, id uuid.UUID) int
-		Users        func(childComplexity int, filter *UserFilter, pagination *PaginationInput) int
+		DownloadTaskAttachment func(childComplexity int, taskID uuid.UUID, attachmentID uuid.UUID) int
+		Label                  func(childComplexity int, id uuid.UUID) int
+		Labels                 func(childComplexity int) int
+		Me                     func(childComplexity int) int
+		OverdueTasks           func(childComplexity int, pagination *PaginationInput) int
+		Role                   func(childComplexity int, id uuid.UUID) int
+		Roles                  func(childComplexity int) int
+		Task                   func(childComplexity int, id uuid.UUID) int
+		TaskAttachments        func(childComplexity int, taskID uuid.UUID) int
+		Tasks                  func(childComplexity int, filter *TaskFilter, pagination *PaginationInput) int
+		User                   func(childComplexity int, id uuid.UUID) int
+		Users                  func(childComplexity int, filter *UserFilter, pagination *PaginationInput) int
 	}
 
 	Role struct {
@@ -133,6 +137,7 @@ type ComplexityRoot struct {
 
 	Task struct {
 		Assignee    func(childComplexity int) int
+		Attachments func(childComplexity int) int
 		CreatedAt   func(childComplexity int) int
 		Creator     func(childComplexity int) int
 		Description func(childComplexity int) int
@@ -143,6 +148,21 @@ type ComplexityRoot struct {
 		Status      func(childComplexity int) int
 		Title       func(childComplexity int) int
 		UpdatedAt   func(childComplexity int) int
+	}
+
+	TaskAttachment struct {
+		ContentType func(childComplexity int) int
+		CreatedAt   func(childComplexity int) int
+		Filename    func(childComplexity int) int
+		ID          func(childComplexity int) int
+		SizeBytes   func(childComplexity int) int
+		TaskID      func(childComplexity int) int
+		UploadedBy  func(childComplexity int) int
+	}
+
+	TaskAttachmentDownload struct {
+		Attachment    func(childComplexity int) int
+		ContentBase64 func(childComplexity int) int
 	}
 
 	TaskConnection struct {
@@ -192,6 +212,8 @@ type MutationResolver interface {
 	ArchiveTask(ctx context.Context, id uuid.UUID) (*Task, error)
 	AddLabelToTask(ctx context.Context, taskID uuid.UUID, labelID uuid.UUID) (*Task, error)
 	RemoveLabelFromTask(ctx context.Context, taskID uuid.UUID, labelID uuid.UUID) (*Task, error)
+	UploadTaskAttachment(ctx context.Context, taskID uuid.UUID, file graphql.Upload) (*TaskAttachment, error)
+	DeleteTaskAttachment(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) (bool, error)
 	UpdateUser(ctx context.Context, id uuid.UUID, input UpdateUserInput) (*User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) (bool, error)
 	AssignRole(ctx context.Context, userID uuid.UUID, roleID uuid.UUID) (*User, error)
@@ -212,6 +234,8 @@ type QueryResolver interface {
 	Role(ctx context.Context, id uuid.UUID) (*Role, error)
 	Label(ctx context.Context, id uuid.UUID) (*Label, error)
 	Labels(ctx context.Context) ([]*Label, error)
+	TaskAttachments(ctx context.Context, taskID uuid.UUID) ([]*TaskAttachment, error)
+	DownloadTaskAttachment(ctx context.Context, taskID uuid.UUID, attachmentID uuid.UUID) (*TaskAttachmentDownload, error)
 }
 type SubscriptionResolver interface {
 	TaskCreated(ctx context.Context) (<-chan *Task, error)
@@ -427,6 +451,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.DeleteTask(childComplexity, args["id"].(uuid.UUID)), true
 
+	case "Mutation.deleteTaskAttachment":
+		if e.complexity.Mutation.DeleteTaskAttachment == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteTaskAttachment_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteTaskAttachment(childComplexity, args["taskId"].(uuid.UUID), args["attachmentId"].(uuid.UUID)), true
+
 	case "Mutation.deleteUser":
 		if e.complexity.Mutation.DeleteUser == nil {
 			break
@@ -554,6 +590,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateUser(childComplexity, args["id"].(uuid.UUID), args["input"].(UpdateUserInput)), true
 
+	case "Mutation.uploadTaskAttachment":
+		if e.complexity.Mutation.UploadTaskAttachment == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_uploadTaskAttachment_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UploadTaskAttachment(childComplexity, args["taskId"].(uuid.UUID), args["file"].(graphql.Upload)), true
+
 	case "PageInfo.endCursor":
 		if e.complexity.PageInfo.EndCursor == nil {
 			break
@@ -609,6 +657,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Permission.Resource(childComplexity), true
+
+	case "Query.downloadTaskAttachment":
+		if e.complexity.Query.DownloadTaskAttachment == nil {
+			break
+		}
+
+		args, err := ec.field_Query_downloadTaskAttachment_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.DownloadTaskAttachment(childComplexity, args["taskId"].(uuid.UUID), args["attachmentId"].(uuid.UUID)), true
 
 	case "Query.label":
 		if e.complexity.Query.Label == nil {
@@ -678,6 +738,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Task(childComplexity, args["id"].(uuid.UUID)), true
+
+	case "Query.taskAttachments":
+		if e.complexity.Query.TaskAttachments == nil {
+			break
+		}
+
+		args, err := ec.field_Query_taskAttachments_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TaskAttachments(childComplexity, args["taskId"].(uuid.UUID)), true
 
 	case "Query.tasks":
 		if e.complexity.Query.Tasks == nil {
@@ -795,6 +867,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Task.Assignee(childComplexity), true
 
+	case "Task.attachments":
+		if e.complexity.Task.Attachments == nil {
+			break
+		}
+
+		return e.complexity.Task.Attachments(childComplexity), true
+
 	case "Task.createdAt":
 		if e.complexity.Task.CreatedAt == nil {
 			break
@@ -864,6 +943,69 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Task.UpdatedAt(childComplexity), true
+
+	case "TaskAttachment.contentType":
+		if e.complexity.TaskAttachment.ContentType == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachment.ContentType(childComplexity), true
+
+	case "TaskAttachment.createdAt":
+		if e.complexity.TaskAttachment.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachment.CreatedAt(childComplexity), true
+
+	case "TaskAttachment.filename":
+		if e.complexity.TaskAttachment.Filename == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachment.Filename(childComplexity), true
+
+	case "TaskAttachment.id":
+		if e.complexity.TaskAttachment.ID == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachment.ID(childComplexity), true
+
+	case "TaskAttachment.sizeBytes":
+		if e.complexity.TaskAttachment.SizeBytes == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachment.SizeBytes(childComplexity), true
+
+	case "TaskAttachment.taskId":
+		if e.complexity.TaskAttachment.TaskID == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachment.TaskID(childComplexity), true
+
+	case "TaskAttachment.uploadedBy":
+		if e.complexity.TaskAttachment.UploadedBy == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachment.UploadedBy(childComplexity), true
+
+	case "TaskAttachmentDownload.attachment":
+		if e.complexity.TaskAttachmentDownload.Attachment == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachmentDownload.Attachment(childComplexity), true
+
+	case "TaskAttachmentDownload.contentBase64":
+		if e.complexity.TaskAttachmentDownload.ContentBase64 == nil {
+			break
+		}
+
+		return e.complexity.TaskAttachmentDownload.ContentBase64(childComplexity), true
 
 	case "TaskConnection.edges":
 		if e.complexity.TaskConnection.Edges == nil {
@@ -1501,6 +1643,57 @@ func (ec *executionContext) field_Mutation_deleteLabel_argsID(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteTaskAttachment_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_deleteTaskAttachment_argsTaskID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["taskId"] = arg0
+	arg1, err := ec.field_Mutation_deleteTaskAttachment_argsAttachmentID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["attachmentId"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_deleteTaskAttachment_argsTaskID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uuid.UUID, error) {
+	if _, ok := rawArgs["taskId"]; !ok {
+		var zeroVal uuid.UUID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("taskId"))
+	if tmp, ok := rawArgs["taskId"]; ok {
+		return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
+	}
+
+	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteTaskAttachment_argsAttachmentID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uuid.UUID, error) {
+	if _, ok := rawArgs["attachmentId"]; !ok {
+		var zeroVal uuid.UUID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("attachmentId"))
+	if tmp, ok := rawArgs["attachmentId"]; ok {
+		return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
+	}
+
+	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteTask_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1924,6 +2117,57 @@ func (ec *executionContext) field_Mutation_updateUser_argsInput(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_uploadTaskAttachment_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_uploadTaskAttachment_argsTaskID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["taskId"] = arg0
+	arg1, err := ec.field_Mutation_uploadTaskAttachment_argsFile(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["file"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_uploadTaskAttachment_argsTaskID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uuid.UUID, error) {
+	if _, ok := rawArgs["taskId"]; !ok {
+		var zeroVal uuid.UUID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("taskId"))
+	if tmp, ok := rawArgs["taskId"]; ok {
+		return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
+	}
+
+	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_uploadTaskAttachment_argsFile(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphql.Upload, error) {
+	if _, ok := rawArgs["file"]; !ok {
+		var zeroVal graphql.Upload
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("file"))
+	if tmp, ok := rawArgs["file"]; ok {
+		return ec.unmarshalNUpload2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, tmp)
+	}
+
+	var zeroVal graphql.Upload
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1949,6 +2193,57 @@ func (ec *executionContext) field_Query___type_argsName(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_downloadTaskAttachment_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_downloadTaskAttachment_argsTaskID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["taskId"] = arg0
+	arg1, err := ec.field_Query_downloadTaskAttachment_argsAttachmentID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["attachmentId"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Query_downloadTaskAttachment_argsTaskID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uuid.UUID, error) {
+	if _, ok := rawArgs["taskId"]; !ok {
+		var zeroVal uuid.UUID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("taskId"))
+	if tmp, ok := rawArgs["taskId"]; ok {
+		return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
+	}
+
+	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_downloadTaskAttachment_argsAttachmentID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uuid.UUID, error) {
+	if _, ok := rawArgs["attachmentId"]; !ok {
+		var zeroVal uuid.UUID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("attachmentId"))
+	if tmp, ok := rawArgs["attachmentId"]; ok {
+		return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
+	}
+
+	var zeroVal uuid.UUID
 	return zeroVal, nil
 }
 
@@ -2029,6 +2324,34 @@ func (ec *executionContext) field_Query_role_argsID(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
 	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
+	}
+
+	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_taskAttachments_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_taskAttachments_argsTaskID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["taskId"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_taskAttachments_argsTaskID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uuid.UUID, error) {
+	if _, ok := rawArgs["taskId"]; !ok {
+		var zeroVal uuid.UUID
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("taskId"))
+	if tmp, ok := rawArgs["taskId"]; ok {
 		return ec.unmarshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
 	}
 
@@ -3032,6 +3355,8 @@ func (ec *executionContext) fieldContext_Mutation_createTask(ctx context.Context
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3111,6 +3436,8 @@ func (ec *executionContext) fieldContext_Mutation_updateTask(ctx context.Context
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3245,6 +3572,8 @@ func (ec *executionContext) fieldContext_Mutation_assignTask(ctx context.Context
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3324,6 +3653,8 @@ func (ec *executionContext) fieldContext_Mutation_unassignTask(ctx context.Conte
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3403,6 +3734,8 @@ func (ec *executionContext) fieldContext_Mutation_changeTaskStatus(ctx context.C
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3482,6 +3815,8 @@ func (ec *executionContext) fieldContext_Mutation_completeTask(ctx context.Conte
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3561,6 +3896,8 @@ func (ec *executionContext) fieldContext_Mutation_archiveTask(ctx context.Contex
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3640,6 +3977,8 @@ func (ec *executionContext) fieldContext_Mutation_addLabelToTask(ctx context.Con
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3719,6 +4058,8 @@ func (ec *executionContext) fieldContext_Mutation_removeLabelFromTask(ctx contex
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -3735,6 +4076,132 @@ func (ec *executionContext) fieldContext_Mutation_removeLabelFromTask(ctx contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_removeLabelFromTask_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_uploadTaskAttachment(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_uploadTaskAttachment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UploadTaskAttachment(rctx, fc.Args["taskId"].(uuid.UUID), fc.Args["file"].(graphql.Upload))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*TaskAttachment)
+	fc.Result = res
+	return ec.marshalNTaskAttachment2ᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_uploadTaskAttachment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TaskAttachment_id(ctx, field)
+			case "taskId":
+				return ec.fieldContext_TaskAttachment_taskId(ctx, field)
+			case "filename":
+				return ec.fieldContext_TaskAttachment_filename(ctx, field)
+			case "contentType":
+				return ec.fieldContext_TaskAttachment_contentType(ctx, field)
+			case "sizeBytes":
+				return ec.fieldContext_TaskAttachment_sizeBytes(ctx, field)
+			case "uploadedBy":
+				return ec.fieldContext_TaskAttachment_uploadedBy(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TaskAttachment_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TaskAttachment", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_uploadTaskAttachment_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteTaskAttachment(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteTaskAttachment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().DeleteTaskAttachment(rctx, fc.Args["taskId"].(uuid.UUID), fc.Args["attachmentId"].(uuid.UUID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteTaskAttachment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteTaskAttachment_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4643,6 +5110,8 @@ func (ec *executionContext) fieldContext_Query_task(ctx context.Context, field g
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -5214,6 +5683,138 @@ func (ec *executionContext) fieldContext_Query_labels(_ context.Context, field g
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_taskAttachments(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_taskAttachments(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TaskAttachments(rctx, fc.Args["taskId"].(uuid.UUID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*TaskAttachment)
+	fc.Result = res
+	return ec.marshalNTaskAttachment2ᚕᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachmentᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_taskAttachments(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TaskAttachment_id(ctx, field)
+			case "taskId":
+				return ec.fieldContext_TaskAttachment_taskId(ctx, field)
+			case "filename":
+				return ec.fieldContext_TaskAttachment_filename(ctx, field)
+			case "contentType":
+				return ec.fieldContext_TaskAttachment_contentType(ctx, field)
+			case "sizeBytes":
+				return ec.fieldContext_TaskAttachment_sizeBytes(ctx, field)
+			case "uploadedBy":
+				return ec.fieldContext_TaskAttachment_uploadedBy(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TaskAttachment_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TaskAttachment", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_taskAttachments_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_downloadTaskAttachment(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_downloadTaskAttachment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().DownloadTaskAttachment(rctx, fc.Args["taskId"].(uuid.UUID), fc.Args["attachmentId"].(uuid.UUID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*TaskAttachmentDownload)
+	fc.Result = res
+	return ec.marshalNTaskAttachmentDownload2ᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachmentDownload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_downloadTaskAttachment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "attachment":
+				return ec.fieldContext_TaskAttachmentDownload_attachment(ctx, field)
+			case "contentBase64":
+				return ec.fieldContext_TaskAttachmentDownload_contentBase64(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TaskAttachmentDownload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_downloadTaskAttachment_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query___type(ctx, field)
 	if err != nil {
@@ -5643,6 +6244,8 @@ func (ec *executionContext) fieldContext_Subscription_taskCreated(_ context.Cont
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -5725,6 +6328,8 @@ func (ec *executionContext) fieldContext_Subscription_taskUpdated(ctx context.Co
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -5876,6 +6481,8 @@ func (ec *executionContext) fieldContext_Subscription_taskAssigned(ctx context.C
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -6323,6 +6930,66 @@ func (ec *executionContext) fieldContext_Task_labels(_ context.Context, field gr
 	return fc, nil
 }
 
+func (ec *executionContext) _Task_attachments(ctx context.Context, field graphql.CollectedField, obj *Task) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Task_attachments(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Attachments, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*TaskAttachment)
+	fc.Result = res
+	return ec.marshalNTaskAttachment2ᚕᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachmentᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Task_attachments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Task",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TaskAttachment_id(ctx, field)
+			case "taskId":
+				return ec.fieldContext_TaskAttachment_taskId(ctx, field)
+			case "filename":
+				return ec.fieldContext_TaskAttachment_filename(ctx, field)
+			case "contentType":
+				return ec.fieldContext_TaskAttachment_contentType(ctx, field)
+			case "sizeBytes":
+				return ec.fieldContext_TaskAttachment_sizeBytes(ctx, field)
+			case "uploadedBy":
+				return ec.fieldContext_TaskAttachment_uploadedBy(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TaskAttachment_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TaskAttachment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Task_createdAt(ctx context.Context, field graphql.CollectedField, obj *Task) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Task_createdAt(ctx, field)
 	if err != nil {
@@ -6406,6 +7073,418 @@ func (ec *executionContext) fieldContext_Task_updatedAt(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachment_id(ctx context.Context, field graphql.CollectedField, obj *TaskAttachment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachment_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uuid.UUID)
+	fc.Result = res
+	return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachment_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UUID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachment_taskId(ctx context.Context, field graphql.CollectedField, obj *TaskAttachment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachment_taskId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TaskID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uuid.UUID)
+	fc.Result = res
+	return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachment_taskId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UUID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachment_filename(ctx context.Context, field graphql.CollectedField, obj *TaskAttachment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachment_filename(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Filename, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachment_filename(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachment_contentType(ctx context.Context, field graphql.CollectedField, obj *TaskAttachment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachment_contentType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContentType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachment_contentType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachment_sizeBytes(ctx context.Context, field graphql.CollectedField, obj *TaskAttachment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachment_sizeBytes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SizeBytes, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachment_sizeBytes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachment_uploadedBy(ctx context.Context, field graphql.CollectedField, obj *TaskAttachment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachment_uploadedBy(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UploadedBy, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uuid.UUID)
+	fc.Result = res
+	return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachment_uploadedBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UUID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachment_createdAt(ctx context.Context, field graphql.CollectedField, obj *TaskAttachment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachment_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNDateTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachment_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachment",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachmentDownload_attachment(ctx context.Context, field graphql.CollectedField, obj *TaskAttachmentDownload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachmentDownload_attachment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Attachment, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*TaskAttachment)
+	fc.Result = res
+	return ec.marshalNTaskAttachment2ᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachment(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachmentDownload_attachment(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachmentDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TaskAttachment_id(ctx, field)
+			case "taskId":
+				return ec.fieldContext_TaskAttachment_taskId(ctx, field)
+			case "filename":
+				return ec.fieldContext_TaskAttachment_filename(ctx, field)
+			case "contentType":
+				return ec.fieldContext_TaskAttachment_contentType(ctx, field)
+			case "sizeBytes":
+				return ec.fieldContext_TaskAttachment_sizeBytes(ctx, field)
+			case "uploadedBy":
+				return ec.fieldContext_TaskAttachment_uploadedBy(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TaskAttachment_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TaskAttachment", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskAttachmentDownload_contentBase64(ctx context.Context, field graphql.CollectedField, obj *TaskAttachmentDownload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskAttachmentDownload_contentBase64(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContentBase64, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskAttachmentDownload_contentBase64(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskAttachmentDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6616,6 +7695,8 @@ func (ec *executionContext) fieldContext_TaskEdge_node(_ context.Context, field 
 				return ec.fieldContext_Task_creator(ctx, field)
 			case "labels":
 				return ec.fieldContext_Task_labels(ctx, field)
+			case "attachments":
+				return ec.fieldContext_Task_attachments(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Task_createdAt(ctx, field)
 			case "updatedAt":
@@ -9874,6 +10955,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "uploadTaskAttachment":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_uploadTaskAttachment(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteTaskAttachment":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteTaskAttachment(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "updateUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateUser(ctx, field)
@@ -10282,6 +11377,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "taskAttachments":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_taskAttachments(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "downloadTaskAttachment":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_downloadTaskAttachment(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -10442,6 +11581,11 @@ func (ec *executionContext) _Task(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "attachments":
+			out.Values[i] = ec._Task_attachments(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createdAt":
 			out.Values[i] = ec._Task_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -10449,6 +11593,119 @@ func (ec *executionContext) _Task(ctx context.Context, sel ast.SelectionSet, obj
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Task_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var taskAttachmentImplementors = []string{"TaskAttachment"}
+
+func (ec *executionContext) _TaskAttachment(ctx context.Context, sel ast.SelectionSet, obj *TaskAttachment) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, taskAttachmentImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TaskAttachment")
+		case "id":
+			out.Values[i] = ec._TaskAttachment_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "taskId":
+			out.Values[i] = ec._TaskAttachment_taskId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "filename":
+			out.Values[i] = ec._TaskAttachment_filename(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "contentType":
+			out.Values[i] = ec._TaskAttachment_contentType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sizeBytes":
+			out.Values[i] = ec._TaskAttachment_sizeBytes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "uploadedBy":
+			out.Values[i] = ec._TaskAttachment_uploadedBy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._TaskAttachment_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var taskAttachmentDownloadImplementors = []string{"TaskAttachmentDownload"}
+
+func (ec *executionContext) _TaskAttachmentDownload(ctx context.Context, sel ast.SelectionSet, obj *TaskAttachmentDownload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, taskAttachmentDownloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TaskAttachmentDownload")
+		case "attachment":
+			out.Values[i] = ec._TaskAttachmentDownload_attachment(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "contentBase64":
+			out.Values[i] = ec._TaskAttachmentDownload_contentBase64(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11359,6 +12616,78 @@ func (ec *executionContext) marshalNTask2ᚖgithubᚗcomᚋhandiismᚋgoᚑclean
 	return ec._Task(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNTaskAttachment2githubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachment(ctx context.Context, sel ast.SelectionSet, v TaskAttachment) graphql.Marshaler {
+	return ec._TaskAttachment(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTaskAttachment2ᚕᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachmentᚄ(ctx context.Context, sel ast.SelectionSet, v []*TaskAttachment) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTaskAttachment2ᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachment(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTaskAttachment2ᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachment(ctx context.Context, sel ast.SelectionSet, v *TaskAttachment) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TaskAttachment(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTaskAttachmentDownload2githubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachmentDownload(ctx context.Context, sel ast.SelectionSet, v TaskAttachmentDownload) graphql.Marshaler {
+	return ec._TaskAttachmentDownload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTaskAttachmentDownload2ᚖgithubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskAttachmentDownload(ctx context.Context, sel ast.SelectionSet, v *TaskAttachmentDownload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TaskAttachmentDownload(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNTaskConnection2githubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐTaskConnection(ctx context.Context, sel ast.SelectionSet, v TaskConnection) graphql.Marshaler {
 	return ec._TaskConnection(ctx, sel, &v)
 }
@@ -11465,6 +12794,21 @@ func (ec *executionContext) unmarshalNUpdateTaskInput2githubᚗcomᚋhandiismᚋ
 func (ec *executionContext) unmarshalNUpdateUserInput2githubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐUpdateUserInput(ctx context.Context, v any) (UpdateUserInput, error) {
 	res, err := ec.unmarshalInputUpdateUserInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpload2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx context.Context, v any) (graphql.Upload, error) {
+	res, err := graphql.UnmarshalUpload(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUpload2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx context.Context, sel ast.SelectionSet, v graphql.Upload) graphql.Marshaler {
+	res := graphql.MarshalUpload(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) marshalNUser2githubᚗcomᚋhandiismᚋgoᚑcleanᚑarchᚑpocᚋinternalᚋtransportᚋgraphqlᚐUser(ctx context.Context, sel ast.SelectionSet, v User) graphql.Marshaler {

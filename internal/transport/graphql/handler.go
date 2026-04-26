@@ -4,19 +4,27 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/gorilla/websocket"
 	"github.com/handiism/go-clean-arch-poc/internal/application/port/input"
 	"github.com/handiism/go-clean-arch-poc/internal/auth"
 )
 
 // NewHandler creates a new GraphQL HTTP handler.
 func NewHandler(resolver *Resolver, authService input.AuthService) http.Handler {
-	srv := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: resolver}))
+	srv := handler.New(NewExecutableSchema(Config{Resolvers: resolver}))
 
-	// Add GET support for simple queries and subscriptions
+	// Add explicit transports so subscriptions work over WebSocket.
+	srv.AddTransport(transport.Websocket{
+		KeepAlivePingInterval: 30 * time.Second,
+		Upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool { return true },
+		},
+	})
 	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
 	srv.AddTransport(transport.MultipartForm{})
